@@ -334,5 +334,4 @@ ASALocalRun/
 appsettings.Development.json
 
 # Visual Studio Solution Files
-*.sln
 *.sln.docstates
