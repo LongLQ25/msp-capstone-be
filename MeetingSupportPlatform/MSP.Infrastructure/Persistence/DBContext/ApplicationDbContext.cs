@@ -25,32 +25,193 @@ namespace MSP.Infrastructure.Persistence.DBContext
             builder.ApplyConfiguration(new RoleConfiguration());
             builder.ApplyConfiguration(new UserConfiguration());
             builder.Entity<User>()
-                .Property(u => u.FirstName)
+                .Property(u => u.FullName)
                 .HasMaxLength(256);
+
             builder.Entity<User>()
-                .Property(u => u.LastName)
-            .HasMaxLength(256);
+                .HasOne(u => u.ManagedBy)
+                .WithMany(u => u.ManagedUsers)
+                .HasForeignKey(u => u.ManagedById)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            builder.Entity<Notification>(entity =>
+            builder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany(u => u.Notifications)
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Package - Feature (many-to-many)
+            builder.Entity<Package>()
+                .HasMany(p => p.Features)
+                .WithMany(f => f.Packages)
+                .UsingEntity<Dictionary<string, object>>(
+                    "PackageFeature",
+                    j => j.HasOne<Feature>().WithMany().HasForeignKey("FeatureId").OnDelete(DeleteBehavior.Cascade),
+                    j => j.HasOne<Package>().WithMany().HasForeignKey("PackageId").OnDelete(DeleteBehavior.Cascade),
+                    j =>
+                    {
+                        j.HasKey("PackageId", "FeatureId");
+                        j.ToTable("PackageFeatures");
+                    });
+
+            // Subscription
+            builder.Entity<Subscription>(entity =>
             {
-                entity.ToTable("Notifications", "notification");
+                entity.HasOne(s => s.Package)
+                    .WithMany()
+                    .HasForeignKey(s => s.PackageId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.HasOne(s => s.User)
+                    .WithMany()
+                    .HasForeignKey(s => s.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
-                entity.Property(e => e.UserId).IsRequired().HasMaxLength(450);
-                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.Message).IsRequired().HasMaxLength(1000);
-                entity.Property(e => e.Type).HasMaxLength(50);
-                entity.Property(e => e.Data).HasMaxLength(4000);
+            // Project
+            builder.Entity<Project>(entity =>
+            {
+                entity.HasOne(p => p.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(p => p.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
 
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.IsRead).IsRequired();
+                entity.HasOne(p => p.Owner)
+                    .WithMany()
+                    .HasForeignKey(p => p.OwnerId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
-                // Indexes
-                entity.HasIndex(e => e.UserId);
-                entity.HasIndex(e => e.CreatedAt);
-                entity.HasIndex(e => e.IsRead);
+                entity.HasMany(p => p.ProjectMembers)
+                    .WithOne(pm => pm.Project)
+                    .HasForeignKey(pm => pm.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.Milestones)
+                    .WithOne(m => m.Project)
+                    .HasForeignKey(m => m.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.ProjectTasks)
+                    .WithOne(t => t.Project)
+                    .HasForeignKey(t => t.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.Documents)
+                    .WithOne(d => d.Project)
+                    .HasForeignKey(d => d.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.Meetings)
+                    .WithOne(m => m.Project)
+                    .HasForeignKey(m => m.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ProjectMember
+            builder.Entity<ProjectMember>(entity =>
+            {
+                entity.HasOne(pm => pm.Member)
+                    .WithMany()
+                    .HasForeignKey(pm => pm.MemberId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Document
+            builder.Entity<Document>(entity =>
+            {
+                entity.HasOne(d => d.Owner)
+                    .WithMany()
+                    .HasForeignKey(d => d.OwnerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Milestone
+            builder.Entity<Milestone>(entity =>
+            {
+                entity.HasOne(m => m.User)
+                    .WithMany()
+                    .HasForeignKey(m => m.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasMany(m => m.ProjectTasks)
+                    .WithMany(t => t.Milestones)  // thiết kế m:n
+                    .UsingEntity<Dictionary<string, object>>(
+                        "MilestoneTask",
+                        j => j.HasOne<ProjectTask>().WithMany().HasForeignKey("ProjectTaskId").OnDelete(DeleteBehavior.Cascade),
+                        j => j.HasOne<Milestone>().WithMany().HasForeignKey("MilestoneId").OnDelete(DeleteBehavior.Cascade),
+                        j =>
+                        {
+                            j.HasKey("MilestoneId", "ProjectTaskId");
+                            j.ToTable("MilestoneTasks");
+                        });
+            });
+
+            // Task
+            builder.Entity<ProjectTask>(entity =>
+            {
+                entity.HasOne(t => t.User)
+                    .WithMany()
+                    .HasForeignKey(t => t.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(t => t.Todo)
+                    .WithMany(todo => todo.ProjectTasks)
+                    .HasForeignKey(t => t.TodoId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(t => t.Comments)
+                    .WithOne(c => c.ProjectTask)
+                    .HasForeignKey(c => c.TaskId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Comment
+            builder.Entity<Comment>(entity =>
+            {
+                entity.HasOne(c => c.User)
+                    .WithMany()
+                    .HasForeignKey(c => c.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Meeting
+            builder.Entity<Meeting>(entity =>
+            {
+                entity.HasOne(m => m.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(m => m.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(m => m.Milestone)
+                    .WithMany()
+                    .HasForeignKey(m => m.MilestoneId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasMany(m => m.Attendees)
+                    .WithMany()
+                    .UsingEntity<Dictionary<string, object>>(
+                        "MeetingUser",
+                        j => j.HasOne<User>().WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade),
+                        j => j.HasOne<Meeting>().WithMany().HasForeignKey("MeetingId").OnDelete(DeleteBehavior.Cascade),
+                        j =>
+                        {
+                            j.HasKey("MeetingId", "UserId");
+                            j.ToTable("MeetingUsers");
+                        });
+            });
+
+            // Todo
+            builder.Entity<Todo>(entity =>
+            {
+                entity.HasOne(t => t.Meeting)
+                    .WithMany(m => m.Todos)
+                    .HasForeignKey(t => t.MeetingId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(t => t.User)
+                    .WithMany()
+                    .HasForeignKey(t => t.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

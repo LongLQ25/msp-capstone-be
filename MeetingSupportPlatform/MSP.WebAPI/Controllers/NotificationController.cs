@@ -15,29 +15,22 @@ namespace NotificationService.API.Controllers
             _notificationService = notificationService;
         }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateNotification([FromBody] CreateNotificationRequest request)
-        {
-            var result = await _notificationService.CreateNotificationAsync(request);
-            return Ok(result);
-        }
-
         [HttpGet("user/{userId}")]
-        public async Task<IActionResult> GetUserNotifications(string userId)
+        public async Task<IActionResult> GetUserNotifications(Guid userId)
         {
             var notifications = await _notificationService.GetUserNotificationsAsync(userId);
             return Ok(notifications);
         }
 
         [HttpGet("user/{userId}/unread")]
-        public async Task<IActionResult> GetUserUnreadNotifications(string userId)
+        public async Task<IActionResult> GetUserUnreadNotifications(Guid userId)
         {
             var notifications = await _notificationService.GetUserUnreadNotificationsAsync(userId);
             return Ok(notifications);
         }
 
         [HttpGet("user/{userId}/unread-count")]
-        public async Task<IActionResult> GetUnreadCount(string userId)
+        public async Task<IActionResult> GetUnreadCount(Guid userId)
         {
             var count = await _notificationService.GetUnreadCountAsync(userId);
             return Ok(new { UnreadCount = count });
@@ -60,22 +53,17 @@ namespace NotificationService.API.Controllers
         [HttpPost("send")]
         public async Task<IActionResult> SendNotification([FromBody] CreateNotificationRequest request)
         {
-            await _notificationService.SendToUserAsync(
-                request.UserId, 
-                request.Title, 
-                request.Message, 
-                request.Type, 
-                request.Data);
+            await _notificationService.CreateInAppNotificationAsync(request);
             
             return Ok(new { Message = "Notification sent successfully" });
         }
 
-        [HttpPost("send-realtime")]
-        public async Task<IActionResult> SendRealtimeNotification([FromBody] CreateNotificationRequest request)
-        {
-            var result = await _notificationService.CreateNotificationAsync(request);
-            return Ok(new { Message = "Real-time notification sent successfully", Notification = result });
-        }
+        //[HttpPost("send-realtime")]
+        //public async Task<IActionResult> SendRealtimeNotification([FromBody] CreateNotificationRequest request)
+        //{
+        //    var result = await _notificationService.CreateInAppNotificationAsync(request);
+        //    return Ok(new { Message = "Real-time notification sent successfully", Notification = result });
+        //}
 
         //[HttpPost("broadcast")]
         //public async Task<IActionResult> BroadcastNotification([FromBody] BroadcastNotificationRequest request)

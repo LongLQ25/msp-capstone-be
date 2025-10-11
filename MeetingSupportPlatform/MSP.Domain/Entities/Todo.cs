@@ -1,0 +1,21 @@
+﻿using MSP.Domain.Base;
+
+namespace MSP.Domain.Entities
+{
+    public class Todo : BaseEntity<Guid>
+    {
+        public Guid MeetingId { get; set; }
+        public virtual Meeting Meeting { get; set; }
+
+        public Guid? UserId { get; set; }
+        public virtual User? User { get; set; }
+
+        public string Title { get; set; }
+        public string? Description { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
+        public virtual ICollection<ProjectTask> ProjectTasks { get; set; } = new List<ProjectTask>();
+
+    }
+}
