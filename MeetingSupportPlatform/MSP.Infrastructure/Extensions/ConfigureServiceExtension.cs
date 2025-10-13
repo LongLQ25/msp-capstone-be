@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Implementations;
 using MSP.Infrastructure.Options;
+using MSP.Infrastructure.Repositories;
 
 namespace MSP.Infrastructure.Extensions
 {
@@ -16,6 +17,8 @@ namespace MSP.Infrastructure.Extensions
             // Configure Email Settings
             services.Configure<EmailSettings>(config.GetSection("EmailSettings"));
 
+            // Register Processors
+            services.AddScoped(typeof(IGenericRepository<,>), typeof(GenericRepository<,>));
             services.AddScoped<IAuthTokenProcessor, AuthTokenProcessor>();
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<INotificationRepository, NotificationRepository>();
