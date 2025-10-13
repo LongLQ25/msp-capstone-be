@@ -7,6 +7,8 @@ using MSP.Application.Services.Implementations.Meeting;
 using MSP.Application.Services.Interfaces.Meeting;
 using MSP.Application.Services.Implementations.Summarize;
 using MSP.Application.Services.Interfaces.Summarize;
+using MSP.Application.Services.Interfaces.Project;
+using MSP.Application.Services.Implementations.Project;
 
 namespace MSP.Application.Extensions
 {
@@ -18,6 +20,7 @@ namespace MSP.Application.Extensions
             services.AddScoped<IAccountService, AccountService>();
             services.AddScoped<INotificationService, MSP.Application.Services.Implementations.Notification.NotificationService>();
             services.AddScoped<ISummarizeTextService, SummarizeTextService>();
+            services.AddScoped<IProjectService, ProjectService>();
 
             // Đăng ký StreamSettings từ appsettings.json
             services.Configure<StreamSettings>(

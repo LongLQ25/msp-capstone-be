@@ -1,0 +1,35 @@
+﻿using Microsoft.EntityFrameworkCore;
+using MSP.Application.Repositories;
+using MSP.Domain.Entities;
+using MSP.Infrastructure.Persistence.DBContext;
+
+namespace MSP.Infrastructure.Repositories
+{
+    public class ProjectTaskRepository(ApplicationDbContext context) : GenericRepository<ProjectTask, Guid>(context), IProjectTaskRepository
+    {
+        public async Task<IEnumerable<ProjectTask>> GetTasksByMilestoneIdAsync(Guid milestoneId)
+        {
+            return await _context.ProjectTasks
+                .Include(pt => pt.Milestones)
+                .Where(pt => pt.Milestones.Any(m => m.Id == milestoneId) && !pt.IsDeleted)
+                .ToListAsync();
+        }
+
+        public async Task<ProjectTask?> GetTaskByIdAsync(Guid id)
+        {
+            return await _context.ProjectTasks
+                .Include(pt => pt.Milestones)
+                .Include(pt => pt.User)
+                .FirstOrDefaultAsync(pt => pt.Id == id && !pt.IsDeleted);
+        }
+
+        public async Task<IEnumerable<ProjectTask>> GetTasksByProjectIdAsync(Guid projectId)
+        {
+            return await _context.ProjectTasks
+                .Where(pt => pt.ProjectId == projectId && !pt.IsDeleted)
+                .Include(pt => pt.Milestones)
+                .Include(pt => pt.User)
+                .ToListAsync();
+        }
+    }
+}

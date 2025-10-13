@@ -29,7 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Jobs\" />
+    <Folder Include="Models\Requests\Milestone\" />
+    <Folder Include="Models\Requests\ProjectTask\" />
+    <Folder Include="Models\Responses\Milestone\" />
+    <Folder Include="Models\Responses\ProjectTask\" />
   </ItemGroup>
 
 </Project>
