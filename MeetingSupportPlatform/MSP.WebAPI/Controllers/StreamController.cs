@@ -1,6 +1,8 @@
-﻿using MSP.Application.Services.Interfaces.Meeting;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using MSP.Application.Models.Requests.Meeting;
+using MSP.Application.Services.Interfaces.Meeting;
+using MSP.Domain.Entities;
 
 namespace MeetingService.API.Controllers
 {
@@ -29,6 +31,62 @@ namespace MeetingService.API.Controllers
                 request.Id,
                 Token = userToken
             });
+        }
+        [HttpPost("call/create-call")]
+        public async Task<IActionResult> CreateCall([FromBody] CreateMeetingRequest request)
+        {
+            try
+            {
+                await _streamService.CreateMeetingAsync(request);
+                return Ok(new { Message = "Notification sent successfully" });
+
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+        [HttpPut("call/{id}/update")]
+        public async Task<IActionResult> UpdateMeeting(Guid id, [FromBody] UpdateMeetingRequest request)
+        {
+            if (id != request.MeetingId)
+                return BadRequest("Meeting ID mismatch.");
+
+            try
+            {
+                await _streamService.UpdateMeetingAsync(request);
+                return NoContent();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound("Meeting not found.");
+            }
+        }
+        [HttpGet("call/{id}")]
+        public async Task<IActionResult> GetMeetingById(Guid id)
+        {
+            var meeting = await _streamService.GetMeetingByIdAsync(id);
+            if (meeting == null)
+                return NotFound("Meeting not found.");
+
+            return Ok(meeting);
+        }
+
+        [HttpGet("call/project/{projectId}")]
+        public async Task<IActionResult> GetMeetingsByProjectId(Guid projectId)
+        {
+            var meetings = await _streamService.GetMeetingsByProjectIdAsync(projectId);
+            return Ok(meetings);
+        }
+
+        [HttpPut("call/{id}/pause")]
+        public async Task<IActionResult> PauseMeeting(Guid id)
+        {
+            var deleted = await _streamService.PauseMeetingAsync(id);
+            if (!deleted)
+                return NotFound();
+
+            return NoContent();
         }
 
         [HttpPost("call/{type}/{id}/delete")]

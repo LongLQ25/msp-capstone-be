@@ -1,4 +1,4 @@
-﻿using MSP.Application.Models;
+﻿using MSP.Application.Models.Responses.Meeting;
 
 namespace MSP.Application.Services.Interfaces.Meeting
 {

@@ -7,12 +7,14 @@ using MSP.Application.Services.Implementations.Meeting;
 using MSP.Application.Services.Interfaces.Meeting;
 using MSP.Application.Services.Implementations.Summarize;
 using MSP.Application.Services.Interfaces.Summarize;
+using MSP.Application.Abstracts;
+using MSP.Infrastructure.Repositories;
 
-namespace MSP.Application.Extensions
+namespace MSP.WebAPI.Extensions
 {
     public static class DependencyInjection
     {
-        public static IServiceCollection AddApplicationService(this IServiceCollection services, IConfiguration configuration)
+        public static IServiceCollection AddDIService(this IServiceCollection services, IConfiguration configuration)
         {
             // Create DI
             services.AddScoped<IAccountService, AccountService>();
@@ -29,7 +31,8 @@ namespace MSP.Application.Extensions
             // Đăng ký StreamService với DI
             services.AddScoped<IStreamService, StreamService>();
             services.AddScoped<IWhisperService, WhisperService>();
-
+            // Đăng ký MeetingRepository với DI
+            services.AddScoped<IMeetingRepository, MeetingRepository>();
             return services;
         }
     }

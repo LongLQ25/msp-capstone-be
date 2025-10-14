@@ -8,8 +8,8 @@ using System.IO;
 using System.Threading.Tasks;
 using Whisper.net;
 using Whisper.net.Ggml;
-using MSP.Application.Models;
 using MSP.Application.Services.Interfaces.Meeting;
+using MSP.Application.Models.Responses.Meeting;
 
 namespace MSP.Application.Services.Implementations.Meeting
 {

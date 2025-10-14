@@ -1,15 +1,15 @@
 //using AuthService.Application.Extensions;
 using MSP.Infrastructure.Extensions;
-using MSP.Application.Extensions;
 using Hangfire;
 using Hangfire.PostgreSql;
+using MSP.WebAPI.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddInfrastuctureService(builder.Configuration);
-builder.Services.AddApplicationService(builder.Configuration);
+builder.Services.AddDIService(builder.Configuration);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -40,7 +40,8 @@ builder.Services.AddCors(options =>
             policy.WithOrigins(
                 "http://localhost:3000",
                 "https://localhost:3000",
-                "https://msp-capstone-fe.vercel.app"
+                "https://msp-capstone-fe.vercel.app",
+                "http://14.225.231.198:4000"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()

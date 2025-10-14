@@ -1,7 +1,11 @@
-﻿using MSP.Application.Models;
-using MSP.Application.Services.Interfaces.Meeting;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using MSP.Application.Abstracts;
+using MSP.Application.Models.Requests.Meeting;
+using MSP.Application.Models.Responses.Meeting;
+using MSP.Application.Services.Interfaces.Meeting;
+using MSP.Domain.Entities;
 using Newtonsoft.Json;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
@@ -17,30 +21,41 @@ public class StreamSettings
 
 }
 
-public class StreamUserRequest
-{
-    [JsonProperty("id")]
-    public string Id { get; set; } = string.Empty;
-
-    [JsonProperty("role")]
-    public string Role { get; set; } = "user";
-
-    [JsonProperty("name")]
-    public string Name { get; set; } = string.Empty;
-
-    [JsonProperty("image")]
-    public string? Image { get; set; }
-}
 
 public class StreamService : IStreamService
 {
     private readonly HttpClient _httpClient;
     private readonly StreamSettings _settings;
+    private readonly IMeetingRepository _meetingRepository;
+    private MeetingResponse MapToResponse(Meeting meeting)
+    {
+        return new MeetingResponse
+        {
+            Id = meeting.Id,
+            Title = meeting.Title,
+            Description = meeting.Description,
+            StartTime = meeting.StartTime,
+            EndTime = meeting.EndTime,
+            Status = meeting.Status,
+            CreatedById = meeting.CreatedById,
+            ProjectId = meeting.ProjectId,
+            MilestoneId = meeting.MilestoneId,
+            CreatedAt = meeting.CreatedAt,
+            UpdatedAt = meeting.UpdatedAt,
+            Attendees = meeting.Attendees?.Select(a => new AttendeeResponse
+            {
+                Id = a.Id,
+                Email = a.Email,
+                AvatarUrl = a.AvatarUrl
+            }).ToList() ?? new List<AttendeeResponse>()
+        };
+    }
 
-    public StreamService(HttpClient httpClient, IOptions<StreamSettings> settings)
+    public StreamService(HttpClient httpClient, IOptions<StreamSettings> settings, IMeetingRepository meetingRepository)
     {
         _httpClient = httpClient;
         _settings = settings.Value;
+        _meetingRepository = meetingRepository;
     }
 
     // Generate Server Token (dùng API Secret để gọi Stream API)
@@ -152,8 +167,73 @@ public class StreamService : IStreamService
         return new List<TranscriptionItem>();
     }
 
+    public async Task CreateMeetingAsync(CreateMeetingRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("Meeting title is required.");
+
+        var meeting = new Meeting
+        {
+            Id = request.MeetingId,
+            CreatedById = request.CreatedById,
+            ProjectId = request.ProjectId,
+            MilestoneId = request.MilestoneId,
+            Title = request.Title,
+            Description = request.Description,
+            StartTime = request.StartTime,
+            Status = "Đã lên lịch",
+            Attendees = new List<User>(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IsDeleted = false
+        };
+
+        if (request.AttendeeIds != null && request.AttendeeIds.Any())
+        {
+            var attendees = await _meetingRepository.GetAttendeesAsync(request.AttendeeIds);
+            meeting.Attendees = attendees;
+        }
+
+        await _meetingRepository.CreateAsync(meeting);
+    }
+
+    public async Task UpdateMeetingAsync(UpdateMeetingRequest request)
+    {
+        var meeting = await _meetingRepository.GetByIdAsync(request.MeetingId);
+        if (meeting == null)
+            throw new KeyNotFoundException("Meeting not found");
+
+        meeting.Title = request.Title;
+        meeting.Description = request.Description;
+        meeting.StartTime = request.StartTime;
+        meeting.UpdatedAt = DateTime.UtcNow;
+
+        if (request.AttendeeIds != null)
+        {
+            var attendees = await _meetingRepository.GetAttendeesAsync(request.AttendeeIds);
+            meeting.Attendees = attendees;
+        }
+
+        await _meetingRepository.UpdateAsync(meeting);
+    }
 
 
+    public async Task<bool> PauseMeetingAsync(Guid meetingId)
+    {
+        return await _meetingRepository.PauseAsync(meetingId);
+    }
 
+    public async Task<MeetingResponse?> GetMeetingByIdAsync(Guid meetingId)
+    {
+        var meeting = await _meetingRepository.GetByIdAsync(meetingId);
+        if (meeting == null) return null;
 
+        return MapToResponse(meeting);
+    }
+
+    public async Task<List<MeetingResponse>> GetMeetingsByProjectIdAsync(Guid projectId)
+    {
+        var meetings = await _meetingRepository.GetByProjectIdAsync(projectId);
+        return meetings.Select(MapToResponse).ToList();
+    }
 }

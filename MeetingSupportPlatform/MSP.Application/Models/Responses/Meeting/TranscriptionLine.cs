@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace MSP.Application.Models
+namespace MSP.Application.Models.Responses.Meeting
 {
     public class TranscriptionItem
     {
