@@ -16,6 +16,18 @@ namespace MSP.Infrastructure.Persistence.DBContext
 
         public DbSet<User> Users { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<Project> Projects { get; set; }
+        public DbSet<ProjectMember> ProjectMembers { get; set; }
+        public DbSet<Document> Documents { get; set; }
+        public DbSet<Milestone> Milestones { get; set; }
+        public DbSet<ProjectTask> ProjectTasks { get; set; }
+        public DbSet<Comment> Comments { get; set; }
+        public DbSet<Meeting> Meetings { get; set; }
+        public DbSet<Todo> Todos { get; set; }
+        public DbSet<Package> Packages { get; set; }
+        public DbSet<Feature> Features { get; set; }
+        public DbSet<Subscription> Subscriptions { get; set; }
+
 
 
         protected override void OnModelCreating(ModelBuilder builder)

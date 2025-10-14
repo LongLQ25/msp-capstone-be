@@ -1,0 +1,12 @@
+﻿using MSP.Application.Abstracts;
+using MSP.Domain.Entities;
+
+namespace MSP.Application.Repositories
+{
+    public interface IProjectTaskRepository : IGenericRepository<ProjectTask, Guid>
+    {
+        Task<IEnumerable<ProjectTask>> GetTasksByMilestoneIdAsync(Guid milestoneId);
+        Task<ProjectTask?> GetTaskByIdAsync(Guid id);
+        Task<IEnumerable<ProjectTask>> GetTasksByProjectIdAsync(Guid projectId);
+    }
+}
