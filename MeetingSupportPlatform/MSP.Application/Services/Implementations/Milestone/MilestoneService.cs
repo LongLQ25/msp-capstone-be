@@ -1,7 +1,10 @@
-﻿using MSP.Application.Models.Requests.Milestone;
+﻿using Microsoft.AspNetCore.Identity;
+using MSP.Application.Models.Requests.Milestone;
 using MSP.Application.Models.Responses.Milestone;
+using MSP.Application.Models.Responses.Project;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Milestone;
+using MSP.Domain.Entities;
 using MSP.Shared.Common;
 
 namespace MSP.Application.Services.Implementations.Milestone
@@ -10,15 +13,21 @@ namespace MSP.Application.Services.Implementations.Milestone
     {
         private readonly IMilestoneRepository _milestoneRepository;
         private readonly IProjectRepository _projectRepository;
+        private readonly UserManager<User> _userManager;
 
-        public MilestoneService(IMilestoneRepository milestoneRepository, IProjectRepository projectRepository)
+        public MilestoneService(IMilestoneRepository milestoneRepository, IProjectRepository projectRepository, UserManager<User> userManager)
         {
             _milestoneRepository = milestoneRepository;
             _projectRepository = projectRepository;
+            _userManager = userManager;
         }
 
         public async Task<ApiResponse<GetMilestoneResponse>> CreateMilestoneAsync(CreateMilestoneRequest request)
         {
+            var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+            if (user == null)
+                return ApiResponse<GetMilestoneResponse>.ErrorResponse(null, "User not found");
+
             var project = await _projectRepository.GetByIdAsync(request.ProjectId);
 
             if (project == null)

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using MSP.Application.Models.Requests.ProjectTask;
 using MSP.Application.Models.Responses.Auth;
 using MSP.Application.Models.Responses.Milestone;
@@ -15,12 +16,14 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         private readonly IProjectTaskRepository _projectTaskRepository;
         private readonly IProjectRepository _projectRepository;
         private readonly IMilestoneRepository _milestoneRepository;
+        private readonly UserManager<User> _userManager;
 
-        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository)
+        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository, UserManager<User> userManager)
         {
             _projectTaskRepository = projectTaskRepository;
             _projectRepository = projectRepository;
             _milestoneRepository = milestoneRepository;
+            _userManager = userManager;
         }
 
         public async Task<ApiResponse<GetTaskResponse>> CreateTaskAsync(CreateTaskRequest request)
@@ -31,11 +34,11 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Project not found");
             }
 
-            //var user = await _userRepository.FindAsync(request.UserId);
-            //if (user == null)
-            //{
-            //    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
-            //}
+            var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+            if (user == null)
+            {
+                return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+            }
 
             var newTask = new Domain.Entities.ProjectTask
             {
@@ -75,6 +78,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = newTask.EndDate,
                 CreatedAt = newTask.CreatedAt,
                 UpdatedAt = newTask.UpdatedAt,
+                User = new GetUserResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    AvatarUrl = user.AvatarUrl,
+                },
                 Milestones = newTask.Milestones?.Select(m => new GetMilestoneResponse
                 {
                     Id = m.Id,
@@ -196,6 +206,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
 
         public async Task<ApiResponse<PagingResponse<GetTaskResponse>>> GetTasksByUserIdAsync(PagingRequest request, Guid userId)
         {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+            {
+                return ApiResponse<PagingResponse<GetTaskResponse>>.ErrorResponse(null, "User not found");
+            }
+
             var tasks = await _projectTaskRepository.FindWithIncludePagedAsync(
                 predicate: p => p.UserId == userId && !p.IsDeleted,
                 include: query => query
@@ -252,11 +268,11 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Task not found");
             }
 
-            //var user = await _projectTaskRepository._context.Users.FindAsync(request.UserId);
-            //if (user == null)
-            //{
-            //    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
-            //}
+            var user = await _userManager.FindByIdAsync(request.ProjectId.ToString());
+            if (user == null)
+            {
+                return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+            }
 
             task.Title = request.Title;
             task.Description = request.Description;
