@@ -190,6 +190,26 @@ namespace MSP.Application.Services.Implementations.Users
             return ApiResponse<string>.SuccessResponse($"User {status} successfully!", vnStatus);
         }
 
+        public async Task<ApiResponse<IEnumerable<GetUserResponse>>> GetMembersManagedByAsync(Guid businessOwnerId)
+        {
+            var businessOwner = await _userManager.FindByIdAsync(businessOwnerId.ToString());
+            var members = await _userRepository.GetMembersManagedByAsync(businessOwnerId);
+            var results = members.Select(async user => new GetUserResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                FullName = user.FullName,
+                AvatarUrl = user.AvatarUrl,
+                PhoneNumber = user.PhoneNumber,
+                Organization = user.Organization,
+                ManagedBy = businessOwnerId,
+                ManagerName = businessOwner?.FullName,
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt,
+                RoleName = (await _userManager.GetRolesAsync(user)).ToArray().FirstOrDefault() ?? "Member"
+            });
+            return ApiResponse<IEnumerable<GetUserResponse>>.SuccessResponse(await Task.WhenAll(results), "Members retrieved successfully.");
+        }
     }
 }
 

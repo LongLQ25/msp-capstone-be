@@ -12,6 +12,8 @@ namespace MSP.Application.Services.Interfaces.Users
         Task<ApiResponse<string>> ApproveBusinessOwnerAsync(Guid userId);
         Task<ApiResponse<string>> RejectBusinessOwnerAsync(Guid userId);
         Task<ApiResponse<string>> ToggleUserActiveStatusAsync(Guid userId);
+        Task<ApiResponse<IEnumerable<GetUserResponse>>> GetMembersManagedByAsync(Guid businessOwnerId);
+
     }
 }
 

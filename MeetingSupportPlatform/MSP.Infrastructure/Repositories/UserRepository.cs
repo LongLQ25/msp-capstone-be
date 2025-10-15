@@ -41,9 +41,11 @@ namespace AuthService.Infrastructure.Repositories
                     .Any(ur => ur.UserId == u.Id && ur.Name == UserRoleEnum.BusinessOwner.ToString()))
                 .ToListAsync();
         }
-
-
-
-
+        public async Task<IEnumerable<User>> GetMembersManagedByAsync(Guid businessOwnerId)
+        {
+            var members = await _context.Users
+                .Where(u => u.ManagedBy.Id == businessOwnerId).ToListAsync();
+            return members;
+        }
     }
 }

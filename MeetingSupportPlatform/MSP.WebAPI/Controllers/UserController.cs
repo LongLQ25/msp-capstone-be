@@ -58,5 +58,19 @@ namespace MSP.WebAPI.Controllers
             var result = await _userService.ToggleUserActiveStatusAsync(userId);
             return Ok(result);
         }
+
+        [HttpGet("get-members-managed-by/{businessOwnerId}")]
+        [Authorize(Roles = "BusinessOwner")]
+        public async Task<IActionResult> GetMembersManagedBy([FromRoute] Guid businessOwnerId)
+        {
+            //var userRole = User.Claims.FirstOrDefault(c => c.Type == "role")?.Value;
+            //var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "userId")?.Value;
+            //if (userRole != UserRole.BusinessOwner.ToString() || userIdClaim != businessOwnerId.ToString())
+            //{
+            //    return Forbid();
+            //}
+            var result = await _userService.GetMembersManagedByAsync(businessOwnerId);
+            return Ok(result);
+        }
     }
 }

@@ -9,5 +9,6 @@ namespace MSP.Application.Abstracts
         Task<User?> GetUserByGoogleIdAsync(string googleId);
         Task<IEnumerable<User>> GetBusinessOwnersAsync();
         Task<IEnumerable<User>> GetPendingBusinessOwnersAsync();
+        Task<IEnumerable<User>> GetMembersManagedByAsync(Guid businessOwnerId);
     }
 }
