@@ -34,16 +34,20 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Project not found");
             }
 
-            var user = await _userManager.FindByIdAsync(request.UserId.ToString());
-            if (user == null)
+            User? user = null;
+            if (request.UserId.HasValue)
             {
-                return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+                user = await _userManager.FindByIdAsync(request.UserId.Value.ToString());
+                if (user == null)
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+                }
             }
 
             var newTask = new Domain.Entities.ProjectTask
             {
                 ProjectId = request.ProjectId,
-                UserId = request.UserId,
+                UserId = request.UserId,  // UserId nullable, có thể là null
                 Title = request.Title,
                 Description = request.Description,
                 Status = request.Status,
@@ -78,7 +82,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = newTask.EndDate,
                 CreatedAt = newTask.CreatedAt,
                 UpdatedAt = newTask.UpdatedAt,
-                User = new GetUserResponse
+                User = user == null ? null : new GetUserResponse
                 {
                     Id = user.Id,
                     Email = user.Email,
@@ -89,12 +93,14 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             };
 
             return ApiResponse<GetTaskResponse>.SuccessResponse(response, "Task created successfully");
         }
+
 
         public async Task<ApiResponse<string>> DeleteTaskAsync(Guid taskId)
         {
@@ -127,7 +133,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = task.EndDate,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
-                User = new GetUserResponse
+                User = task.User == null ? null : new GetUserResponse
                 {
                     Id = task.User.Id,
                     Email = task.User.Email,
@@ -138,7 +144,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             };
             return ApiResponse<GetTaskResponse>.SuccessResponse(response, "Task retrieved successfully");
@@ -182,7 +189,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     EndDate = task.EndDate,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
-                    User = new GetUserResponse
+                    User = task.User == null ? null : new GetUserResponse
                     {
                         Id = task.User.Id,
                         Email = task.User.Email,
@@ -193,7 +200,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     {
                         Id = m.Id,
                         ProjectId = m.ProjectId,
-                        Name = m.Name
+                        Name = m.Name,
+                        DueDate = m.DueDate
                     }).ToArray()
                 }),
                 TotalItems = totalTasks,
@@ -239,7 +247,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     EndDate = task.EndDate,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
-                    User = new GetUserResponse
+                    User = task.User == null ? null : new GetUserResponse
                     {
                         Id = task.User.Id,
                         Email = task.User.Email,
@@ -250,7 +258,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     {
                         Id = m.Id,
                         ProjectId = m.ProjectId,
-                        Name = m.Name
+                        Name = m.Name,
+                        DueDate = m.DueDate
                     }).ToArray()
                 }),
                 TotalItems = totalTasks,
@@ -315,7 +324,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = task.EndDate,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
-                User = new GetUserResponse
+                User = task.User == null ? null : new GetUserResponse
                 {
                     Id = task.User.Id,
                     Email = task.User.Email,
@@ -326,7 +335,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             };
 
@@ -358,7 +368,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = task.EndDate,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
-                User = new GetUserResponse
+                User = task.User == null ? null : new GetUserResponse
                 {
                     Id = task.User.Id,
                     Email = task.User.Email,
@@ -369,7 +379,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             }).ToList();
 
