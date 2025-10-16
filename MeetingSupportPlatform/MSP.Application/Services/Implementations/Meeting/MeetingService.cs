@@ -148,12 +148,30 @@ namespace MSP.Application.Services.Implementations.Meeting
 
         private GetMeetingResponse MapToMeetingResponse(Domain.Entities.Meeting meeting)
         {
+            // Get creator's email
+            string createdByEmail = string.Empty;
+            if (meeting.CreatedById != Guid.Empty)
+            {
+                var creator = _userManager.Users.FirstOrDefault(u => u.Id == meeting.CreatedById);
+                if (creator != null)
+                    createdByEmail = creator.Email ?? string.Empty;
+            }
+
+            // Get project name
+            string projectName = meeting.Project?.Name ?? string.Empty;
+
+            // Get milestone name
+            string? milestoneName = meeting.Milestone?.Name;
+
             return new GetMeetingResponse
             {
                 Id = meeting.Id,
                 ProjectId = meeting.ProjectId,
+                ProjectName = projectName,
                 CreatedById = meeting.CreatedById,
+                CreatedByEmail = createdByEmail,
                 MilestoneId = meeting.MilestoneId,
+                MilestoneName = milestoneName,
                 Title = meeting.Title,
                 Description = meeting.Description ?? string.Empty,
                 StartTime = meeting.StartTime,

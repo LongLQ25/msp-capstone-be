@@ -19,9 +19,12 @@ namespace MSP.Application.Models.Responses.Meeting
             public string Status { get; set; } = string.Empty;
 
             public Guid CreatedById { get; set; }
+            public string CreatedByEmail { get; set; } = string.Empty;
 
             public Guid ProjectId { get; set; }
+            public string ProjectName { get; set; } = string.Empty;
             public Guid? MilestoneId { get; set; }
+            public string? MilestoneName { get; set; }
 
             public DateTime CreatedAt { get; set; }
             public DateTime UpdatedAt { get; set; }
