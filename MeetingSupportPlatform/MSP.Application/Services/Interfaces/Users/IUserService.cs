@@ -15,6 +15,7 @@ namespace MSP.Application.Services.Interfaces.Users
         Task<ApiResponse<string>> ToggleUserActiveStatusAsync(Guid userId);
         Task<ApiResponse<IEnumerable<GetUserResponse>>> GetMembersManagedByAsync(Guid businessOwnerId);
         Task<ApiResponse<ReAssignRoleResponse>> ReAssignRoleAsync(ReAssignRoleRequest request);
+        Task<ApiResponse<UserDetailResponse>> GetUserDetailByIdAsync(Guid userId);
 
     }
 }

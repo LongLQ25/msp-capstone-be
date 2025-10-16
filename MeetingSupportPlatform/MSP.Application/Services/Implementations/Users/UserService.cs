@@ -256,6 +256,32 @@ namespace MSP.Application.Services.Implementations.Users
             return ApiResponse<ReAssignRoleResponse>.SuccessResponse(response, "User role reassigned successfully.");
         }
 
+        public async Task<ApiResponse<UserDetailResponse>> GetUserDetailByIdAsync(Guid userId)
+        {
+            var user = await _userManager.Users
+                .Include(u => u.ManagedBy)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                return ApiResponse<UserDetailResponse>.ErrorResponse(null, "User not found.");
+            }
+            var roles = await _userManager.GetRolesAsync(user);
+            var response = new UserDetailResponse
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                AvatarUrl = user.AvatarUrl,
+                Organization = user.Organization,
+                ManagedBy = user.ManagedById,
+                ManagerName = user.ManagedBy?.FullName,
+                CreatedAt = user.CreatedAt,
+                RoleName = roles.FirstOrDefault() ?? "Member"
+            };
+            return ApiResponse<UserDetailResponse>.SuccessResponse(response, "User details retrieved successfully.");
+        }
     }
 }
 

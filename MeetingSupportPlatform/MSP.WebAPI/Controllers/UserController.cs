@@ -73,5 +73,13 @@ namespace MSP.WebAPI.Controllers
             var result = await _userService.ReAssignRoleAsync(request);
             return Ok(result);
         }
+        [HttpGet("detail/{id}")]
+        [Authorize(Roles = "Admin,BusinessOwner,ProjectManager,Member")]
+        public async Task<IActionResult> GetUserDetail([FromRoute] Guid id)
+        {
+            var result = await _userService.GetUserDetailByIdAsync(id);
+            return Ok(result);
+        }
+
     }
 }
