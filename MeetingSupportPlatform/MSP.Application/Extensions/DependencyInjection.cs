@@ -15,6 +15,8 @@ using MSP.Application.Services.Interfaces.ProjectTask;
 using MSP.Application.Services.Implementations.ProjectTask;
 using MSP.Application.Services.Interfaces.Users;
 using MSP.Application.Services.Implementations.Users;
+using MSP.Application.Services.Interfaces.Todos;
+using MSP.Application.Services.Implementations.Todos;
 
 namespace MSP.Application.Extensions
 {
@@ -31,7 +33,7 @@ namespace MSP.Application.Extensions
             services.AddScoped<IProjectTaskService, ProjectTaskService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IMeetingService, MeetingService>();
-
+            services.AddScoped<ITodoService, TodoService>();
             // Đăng ký StreamSettings từ appsettings.json
             services.Configure<StreamSettings>(
                 configuration.GetSection("Stream"));
