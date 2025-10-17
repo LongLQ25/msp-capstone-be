@@ -4,6 +4,7 @@ using MSP.Application.Abstracts;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Models.Requests.User;
 using MSP.Application.Models.Responses.Users;
+using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Notification;
 using MSP.Application.Services.Interfaces.Users;
 using MSP.Domain.Entities;
@@ -18,11 +19,13 @@ namespace MSP.Application.Services.Implementations.Users
         private readonly IUserRepository _userRepository;
         private readonly UserManager<User> _userManager;
         private readonly INotificationService _notificationService;
-        public UserService(UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService)
+        private readonly IOrganizationInviteRepository _organizationInviteRepository;
+        public UserService(UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService, IOrganizationInviteRepository organizationInviteRepository)
         {
             _userManager = userManager;
             _userRepository = userRepository;
             _notificationService = notificationService;
+            _organizationInviteRepository = organizationInviteRepository;
         }
 
         public async Task<ApiResponse<IEnumerable<UserResponse>>> GetBusinessOwnersAsync()
@@ -195,7 +198,15 @@ namespace MSP.Application.Services.Implementations.Users
         {
             var businessOwner = await _userManager.FindByIdAsync(businessOwnerId.ToString());
             var members = await _userRepository.GetMembersManagedByAsync(businessOwnerId);
-            var results = members.Select(async user => new GetUserResponse
+
+            var memberRoles = new Dictionary<Guid, string>();
+            foreach (var user in members)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                memberRoles[user.Id] = roles.FirstOrDefault() ?? "Member";
+            }
+
+            var results = members.Select(user => new GetUserResponse
             {
                 Id = user.Id,
                 Email = user.Email,
@@ -207,10 +218,15 @@ namespace MSP.Application.Services.Implementations.Users
                 ManagerName = businessOwner?.FullName,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
-                RoleName = (await _userManager.GetRolesAsync(user)).ToArray().FirstOrDefault() ?? "Member"
+                RoleName = memberRoles[user.Id] // Lấy từ dictionary
             });
-            return ApiResponse<IEnumerable<GetUserResponse>>.SuccessResponse(await Task.WhenAll(results), "Members retrieved successfully.");
+
+            return ApiResponse<IEnumerable<GetUserResponse>>.SuccessResponse(
+                results,
+                "Members retrieved successfully."
+            );
         }
+
 
         public async Task<ApiResponse<ReAssignRoleResponse>> ReAssignRoleAsync(ReAssignRoleRequest request)
         {
@@ -281,6 +297,86 @@ namespace MSP.Application.Services.Implementations.Users
                 RoleName = roles.FirstOrDefault() ?? "Member"
             };
             return ApiResponse<UserDetailResponse>.SuccessResponse(response, "User details retrieved successfully.");
+        }
+
+        public async Task<ApiResponse<IEnumerable<BusinessReponse>>> GetBusinessList(Guid curUserId)
+        {
+            try
+            {
+                // Get all users with BusinessOwner role
+                var users = await _userManager.Users.ToListAsync();
+                var businessOwners = new List<BusinessReponse>();
+
+                foreach (var user in users)
+                {
+                    var roles = await _userManager.GetRolesAsync(user);
+                    if (roles.Contains(UserRoleEnum.BusinessOwner.ToString()))
+                    {
+                        // Count members managed by this business owner
+                        var memberCount = await _userRepository
+                            .CountManagedMembersByBO(user.Id);
+
+                        // Count projects owned by this business owner
+                        var projectCount = await _userRepository.CountProjectsOwnedByBO(user.Id);
+                        // Check curUserId phải member không
+                        var curUser = await _userManager.FindByIdAsync(curUserId.ToString());
+                        var curUserRoles = await _userManager.GetRolesAsync(curUser);
+                        var canRequestJoin = false;
+                        if (curUserRoles.Contains(UserRoleEnum.Member.ToString()))
+                        {
+                            // Nếu là member thì tìm canRequestJoin
+                            // Nếu tồn tại invitation rồi thì canRequestJoin = false
+                            // Ngược lại canRequestJoin = true
+                            canRequestJoin = !(await _organizationInviteRepository.IsInvitationExistsAsync(user.Id, curUserId));
+                        }
+
+                        businessOwners.Add(new BusinessReponse
+                        {
+                            Id = user.Id,
+                            BusinessOwnerName = user.FullName,
+                            BusinessName = user.Organization,
+                            CreatedAt = user.CreatedAt,
+                            MemberCount = memberCount,
+                            ProjectCount = projectCount,
+                            CanRequestJoin = canRequestJoin
+                        });
+                    }
+                }
+
+                return ApiResponse<IEnumerable<BusinessReponse>>.SuccessResponse(businessOwners, "Business owners retrieved successfully.");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<IEnumerable<BusinessReponse>>.ErrorResponse(null, $"Error retrieving business owners: {ex.Message}");
+            }
+        }
+
+        public async Task<ApiResponse<BusinessReponse>> GetBusinessDetail(Guid businessOwnerId)
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == businessOwnerId);
+            if (user == null)
+            {
+                return ApiResponse<BusinessReponse>.ErrorResponse(null, "Business owner not found.");
+            }
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains(UserRoleEnum.BusinessOwner.ToString()))
+            {
+                return ApiResponse<BusinessReponse>.ErrorResponse(null, "User is not a BusinessOwner.");
+            }
+            // Count members managed by this business owner
+            var memberCount = await _userRepository.CountManagedMembersByBO(user.Id);
+            // Count projects owned by this business owner
+            var projectCount = await _userRepository.CountProjectsOwnedByBO(user.Id);
+            var response = new BusinessReponse
+            {
+                Id = user.Id,
+                BusinessOwnerName = user.FullName,
+                BusinessName = user.Organization,
+                CreatedAt = user.CreatedAt,
+                MemberCount = memberCount,
+                ProjectCount = projectCount,
+            };
+            return ApiResponse<BusinessReponse>.SuccessResponse(response, "Business owner details retrieved successfully.");
         }
     }
 }

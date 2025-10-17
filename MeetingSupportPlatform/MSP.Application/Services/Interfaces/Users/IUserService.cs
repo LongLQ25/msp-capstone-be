@@ -16,6 +16,8 @@ namespace MSP.Application.Services.Interfaces.Users
         Task<ApiResponse<IEnumerable<GetUserResponse>>> GetMembersManagedByAsync(Guid businessOwnerId);
         Task<ApiResponse<ReAssignRoleResponse>> ReAssignRoleAsync(ReAssignRoleRequest request);
         Task<ApiResponse<UserDetailResponse>> GetUserDetailByIdAsync(Guid userId);
+        Task<ApiResponse<IEnumerable<BusinessReponse>>> GetBusinessList(Guid curUserId);
+        Task<ApiResponse<BusinessReponse>> GetBusinessDetail(Guid businessOwnerId);
 
     }
 }

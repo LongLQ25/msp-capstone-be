@@ -81,5 +81,24 @@ namespace MSP.WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("business-list")]
+        [Authorize(Roles = "ProjectManager,Member")]
+        public async Task<IActionResult> GetBusinessList()
+        {
+            var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _userService.GetBusinessList(curUserId);
+            return Ok(result);
+        }
+
+        [HttpGet("business-detail/{ownerId}")]
+        [Authorize(Roles = "Admin,BusinessOwner,ProjectManager,Member")]
+        public async Task<IActionResult> GetBusinessDetail([FromRoute] Guid ownerId)
+        {
+            var result = await _userService.GetBusinessDetail(ownerId);
+            return Ok(result);
+        }
+
+
+
     }
 }
