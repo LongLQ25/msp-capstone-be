@@ -25,6 +25,10 @@ namespace MSP.Application.Services.Implementations.Project
 
         public async Task<ApiResponse<GetProjectMemberResponse>> AddProjectMemberAsync(AddProjectMemeberRequest request)
         {
+            var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+            if (user == null)
+                return ApiResponse<GetProjectMemberResponse>.ErrorResponse(null, "User not found");
+
             var project = await _projectRepository.GetByIdAsync(request.ProjectId);
             if (project == null)
             {
@@ -54,6 +58,13 @@ namespace MSP.Application.Services.Implementations.Project
 
         public async Task<ApiResponse<GetProjectResponse>> CreateProjectAsync(CreateProjectRequest request)
         {
+            var user = await _userManager.FindByIdAsync(request.CreatedById.ToString());
+            if (user == null)
+                return ApiResponse<GetProjectResponse>.ErrorResponse(null, "User not found");
+
+            if (!user.ManagedById.HasValue)
+                return ApiResponse<GetProjectResponse>.ErrorResponse(null, "User does not have a Business Owner assigned");
+
             var project = new Domain.Entities.Project
             {
                 Name = request.Name,
@@ -62,11 +73,22 @@ namespace MSP.Application.Services.Implementations.Project
                 EndDate = request.EndDate,
                 Status = request.Status,
                 CreatedById = request.CreatedById,
-                OwnerId = request.OwnerId,
+                OwnerId = user.ManagedById.Value,
                 CreatedAt = DateTime.UtcNow
             };
 
             _ = await _projectRepository.AddAsync(project);
+            await _projectRepository.SaveChangesAsync();
+
+            var projectMember = new ProjectMember
+            {
+                ProjectId = project.Id,
+                MemberId = request.CreatedById,
+                JoinedAt = DateTime.UtcNow
+            };
+
+            await _projectMemberRepository.AddAsync(projectMember);
+            await _projectMemberRepository.SaveChangesAsync();
 
             var response = new GetProjectResponse
             {
@@ -81,7 +103,6 @@ namespace MSP.Application.Services.Implementations.Project
                 Status = project.Status
             };
 
-            await _projectRepository.SaveChangesAsync();
             return ApiResponse<GetProjectResponse>.SuccessResponse(response);
         }
 
@@ -212,6 +233,9 @@ namespace MSP.Application.Services.Implementations.Project
 
         public async Task<ApiResponse<PagingResponse<GetProjectResponse>>> GetProjectsByBOIdAsync(PagingRequest request, Guid boId)
         {
+            var user = await _userManager.FindByIdAsync(boId.ToString());
+            if (user == null)
+                return ApiResponse<PagingResponse<GetProjectResponse>>.ErrorResponse(null, "User not found");
             var projects = await _projectRepository.FindWithIncludePagedAsync(
                 predicate: p => p.OwnerId == boId && !p.IsDeleted,
                 include: query => query
@@ -282,6 +306,9 @@ namespace MSP.Application.Services.Implementations.Project
 
         public async Task<ApiResponse<PagingResponse<GetProjectResponse>>> GetProjectsByManagerIdAsync(PagingRequest request, Guid managerId)
         {
+            var user = await _userManager.FindByIdAsync(managerId.ToString());
+            if (user == null)
+                return ApiResponse<PagingResponse<GetProjectResponse>>.ErrorResponse(null, "User not found");
             var projects = await _projectRepository.FindWithIncludePagedAsync(
                 predicate: p => p.CreatedById == managerId && !p.IsDeleted,
                 include: query => query

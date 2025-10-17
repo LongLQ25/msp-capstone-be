@@ -30,6 +30,18 @@ namespace MSP.WebAPI.Controllers
             return Ok(response);
         }
 
+        [HttpPut]
+        public async Task<IActionResult> UpdateMilestone([FromBody] UpdateMilestoneRequest request)
+        {
+            var response = await _milestoneService.UpdateMilestoneAsync(request);
+            if (!response.Success)
+            {
+                _logger.LogError("UpdateMilestone failed: {Message}", response.Message);
+                return BadRequest(response);
+            }
+            return Ok(response);
+        }
+
         [HttpGet("{milestoneId}")]
         public async Task<IActionResult> GetMilestoneById([FromRoute] Guid milestoneId)
         {

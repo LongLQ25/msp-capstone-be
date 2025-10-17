@@ -59,7 +59,6 @@ namespace MSP.WebAPI.Controllers
         }
 
         [HttpGet("get-members-managed-by/{businessOwnerId}")]
-        [Authorize(Roles = "BusinessOwner")]
         public async Task<IActionResult> GetMembersManagedBy([FromRoute] Guid businessOwnerId)
         {
             var result = await _userService.GetMembersManagedByAsync(businessOwnerId);

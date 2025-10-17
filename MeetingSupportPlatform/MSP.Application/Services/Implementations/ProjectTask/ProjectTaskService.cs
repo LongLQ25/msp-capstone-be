@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using MSP.Application.Models.Requests.ProjectTask;
 using MSP.Application.Models.Responses.Auth;
 using MSP.Application.Models.Responses.Milestone;
@@ -15,12 +16,14 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         private readonly IProjectTaskRepository _projectTaskRepository;
         private readonly IProjectRepository _projectRepository;
         private readonly IMilestoneRepository _milestoneRepository;
+        private readonly UserManager<User> _userManager;
 
-        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository)
+        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository, UserManager<User> userManager)
         {
             _projectTaskRepository = projectTaskRepository;
             _projectRepository = projectRepository;
             _milestoneRepository = milestoneRepository;
+            _userManager = userManager;
         }
 
         public async Task<ApiResponse<GetTaskResponse>> CreateTaskAsync(CreateTaskRequest request)
@@ -31,16 +34,20 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Project not found");
             }
 
-            //var user = await _userRepository.FindAsync(request.UserId);
-            //if (user == null)
-            //{
-            //    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
-            //}
+            User? user = null;
+            if (request.UserId.HasValue)
+            {
+                user = await _userManager.FindByIdAsync(request.UserId.Value.ToString());
+                if (user == null)
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+                }
+            }
 
             var newTask = new Domain.Entities.ProjectTask
             {
                 ProjectId = request.ProjectId,
-                UserId = request.UserId,
+                UserId = request.UserId,  // UserId nullable, có thể là null
                 Title = request.Title,
                 Description = request.Description,
                 Status = request.Status,
@@ -75,16 +82,25 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = newTask.EndDate,
                 CreatedAt = newTask.CreatedAt,
                 UpdatedAt = newTask.UpdatedAt,
+                User = user == null ? null : new GetUserResponse
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    AvatarUrl = user.AvatarUrl,
+                },
                 Milestones = newTask.Milestones?.Select(m => new GetMilestoneResponse
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             };
 
             return ApiResponse<GetTaskResponse>.SuccessResponse(response, "Task created successfully");
         }
+
 
         public async Task<ApiResponse<string>> DeleteTaskAsync(Guid taskId)
         {
@@ -117,7 +133,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = task.EndDate,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
-                User = new GetUserResponse
+                User = task.User == null ? null : new GetUserResponse
                 {
                     Id = task.User.Id,
                     Email = task.User.Email,
@@ -128,7 +144,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             };
             return ApiResponse<GetTaskResponse>.SuccessResponse(response, "Task retrieved successfully");
@@ -172,7 +189,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     EndDate = task.EndDate,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
-                    User = new GetUserResponse
+                    User = task.User == null ? null : new GetUserResponse
                     {
                         Id = task.User.Id,
                         Email = task.User.Email,
@@ -183,7 +200,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     {
                         Id = m.Id,
                         ProjectId = m.ProjectId,
-                        Name = m.Name
+                        Name = m.Name,
+                        DueDate = m.DueDate
                     }).ToArray()
                 }),
                 TotalItems = totalTasks,
@@ -196,6 +214,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
 
         public async Task<ApiResponse<PagingResponse<GetTaskResponse>>> GetTasksByUserIdAsync(PagingRequest request, Guid userId)
         {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+            {
+                return ApiResponse<PagingResponse<GetTaskResponse>>.ErrorResponse(null, "User not found");
+            }
+
             var tasks = await _projectTaskRepository.FindWithIncludePagedAsync(
                 predicate: p => p.UserId == userId && !p.IsDeleted,
                 include: query => query
@@ -223,7 +247,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     EndDate = task.EndDate,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
-                    User = new GetUserResponse
+                    User = task.User == null ? null : new GetUserResponse
                     {
                         Id = task.User.Id,
                         Email = task.User.Email,
@@ -234,7 +258,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     {
                         Id = m.Id,
                         ProjectId = m.ProjectId,
-                        Name = m.Name
+                        Name = m.Name,
+                        DueDate = m.DueDate
                     }).ToArray()
                 }),
                 TotalItems = totalTasks,
@@ -252,11 +277,15 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Task not found");
             }
 
-            //var user = await _projectTaskRepository._context.Users.FindAsync(request.UserId);
-            //if (user == null)
-            //{
-            //    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
-            //}
+            User? user = null;
+            if (request.UserId.HasValue)
+            {
+                user = await _userManager.FindByIdAsync(request.UserId.Value.ToString());
+                if (user == null)
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+                }
+            }
 
             task.Title = request.Title;
             task.Description = request.Description;
@@ -299,7 +328,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = task.EndDate,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
-                User = new GetUserResponse
+                User = task.User == null ? null : new GetUserResponse
                 {
                     Id = task.User.Id,
                     Email = task.User.Email,
@@ -310,7 +339,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             };
 
@@ -342,7 +372,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 EndDate = task.EndDate,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
-                User = new GetUserResponse
+                User = task.User == null ? null : new GetUserResponse
                 {
                     Id = task.User.Id,
                     Email = task.User.Email,
@@ -353,7 +383,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     Id = m.Id,
                     ProjectId = m.ProjectId,
-                    Name = m.Name
+                    Name = m.Name,
+                    DueDate = m.DueDate
                 }).ToArray()
             }).ToList();
 
