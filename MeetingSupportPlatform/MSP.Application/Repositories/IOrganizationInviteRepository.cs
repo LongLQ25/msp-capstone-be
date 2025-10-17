@@ -19,7 +19,5 @@ namespace MSP.Application.Repositories
         Task UpdateAsync(OrganizationInvitation invitation);
         Task<IEnumerable<OrganizationInvitation>> GetAllPendingInvitationsByMemberIdAsync(Guid memberId);
         Task UpdateRangeAsync(IEnumerable<OrganizationInvitation> invitations);
-
-
     }
 }

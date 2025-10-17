@@ -86,12 +86,15 @@ namespace MSP.WebAPI.Controllers
         {
             var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
             var result = await _organizationInvitationService.MemberLeaveOrganizationAsync(curUserId);
+            return Ok(result);
+        }
 
-            if (!result.Success)
-            {
-                return BadRequest(result);
-            }
-
+        [HttpPost("reject-invitation/{invitationId}")]
+        [Authorize(Roles = "Member")]
+        public async Task<IActionResult> RejectInvitation(Guid invitationId)
+        {
+            var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _organizationInvitationService.MemberRejectInvitationAsync(curUserId, invitationId);
             return Ok(result);
         }
     }

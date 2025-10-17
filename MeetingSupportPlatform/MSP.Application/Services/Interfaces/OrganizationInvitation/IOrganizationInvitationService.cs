@@ -34,5 +34,9 @@ namespace MSP.Application.Services.Interfaces.OrganizationInvitation
         // Member rời khỏi organization
         Task<ApiResponse<string>> MemberLeaveOrganizationAsync(Guid memberId);
 
+        // Member reject Invitation từ BO
+        Task<ApiResponse<string>> MemberRejectInvitationAsync(Guid memberId, Guid invitationId);
+
+
     }
 }

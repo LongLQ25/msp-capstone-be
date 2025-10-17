@@ -18,11 +18,13 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
     public class OrganizationInvitationService : IOrganizationInvitationService
     {
         private readonly IOrganizationInviteRepository _organizationInviteRepository;
+        private readonly IProjectMemberRepository _projectMemberRepository;
         private readonly UserManager<User> _userManager;
-        public OrganizationInvitationService(IOrganizationInviteRepository organizationInviteRepository, UserManager<User> userManager)
+        public OrganizationInvitationService(IOrganizationInviteRepository organizationInviteRepository, UserManager<User> userManager, IProjectMemberRepository projectMemberRepository)
         {
             _organizationInviteRepository = organizationInviteRepository;
             _userManager = userManager;
+            _projectMemberRepository = projectMemberRepository;
         }
 
         public async Task<ApiResponse<string>> BusinessOwnerAcceptRequestAsync(Guid businessOwnerId, Guid invitationId)
@@ -317,35 +319,33 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
         {
             try
             {
-                // 1. Lấy member
                 var member = await _userManager.FindByIdAsync(memberId.ToString());
-
                 if (member == null)
-                {
                     return ApiResponse<string>.ErrorResponse("Member not found.");
-                }
 
-                // 2. Kiểm tra member có thuộc organization nào không
                 if (member.ManagedById == null && string.IsNullOrEmpty(member.Organization))
-                {
                     return ApiResponse<string>.ErrorResponse("You are not a member of any organization.");
-                }
 
-                // 3. Lưu tên organization cũ để trả về message
                 var oldOrganization = member.Organization;
-
-                // 4. Set lại Organization và ManagedById = null
                 member.Organization = null;
                 member.ManagedById = null;
 
                 var updateResult = await _userManager.UpdateAsync(member);
                 if (!updateResult.Succeeded)
-                {
                     return ApiResponse<string>.ErrorResponse("Failed to leave organization.");
+
+                // Sử dụng repository thay vì context
+                var activeMemberships = await _projectMemberRepository.GetActiveMembershipsByMemberIdAsync(memberId);
+                var now = DateTime.UtcNow;
+                foreach (var pm in activeMemberships)
+                {
+                    pm.LeftAt = now;
                 }
+                await _projectMemberRepository.UpdateRangeAsync(activeMemberships);
+                await _projectMemberRepository.SaveChangesAsync();
 
                 return ApiResponse<string>.SuccessResponse(
-                    $"You have successfully left {oldOrganization ?? "the organization"}.",
+                    $"You have successfully left {oldOrganization ?? "the organization"}. Project memberships updated ({activeMemberships.Count}).",
                     "Left organization successfully.");
             }
             catch (Exception ex)
@@ -353,6 +353,39 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                 return ApiResponse<string>.ErrorResponse($"Error leaving organization: {ex.Message}");
             }
         }
+
+        public async Task<ApiResponse<string>> MemberRejectInvitationAsync(Guid memberId, Guid invitationId)
+        {
+            try
+            {
+                // 1. Lấy invitation
+                var invitation = await _organizationInviteRepository.GetByIdAsync(invitationId);
+                if (invitation == null)
+                    return ApiResponse<string>.ErrorResponse("Invitation not found.");
+
+                // 2. Kiểm tra đúng member và là loại Invite đang Pending
+                if (invitation.MemberId != memberId)
+                    return ApiResponse<string>.ErrorResponse("You are not authorized to reject this invitation.");
+                if (invitation.Type != InvitationType.Invite)
+                    return ApiResponse<string>.ErrorResponse("This is not a business invitation.");
+                if (invitation.Status != InvitationStatus.Pending)
+                    return ApiResponse<string>.ErrorResponse($"This invitation is already {invitation.Status}.");
+
+                // 3. Cập nhật status thành Rejected
+                invitation.Status = InvitationStatus.Rejected;
+                invitation.RespondedAt = DateTime.UtcNow;
+                await _organizationInviteRepository.UpdateAsync(invitation);
+
+                return ApiResponse<string>.SuccessResponse(
+                    $"You have rejected the invitation from business.",
+                    "Invitation rejected successfully.");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<string>.ErrorResponse($"Error rejecting invitation: {ex.Message}");
+            }
+        }
+
 
         public async Task<ApiResponse<bool>> RequestJoinOrganizeAsync(Guid memberId, Guid businessOwnerId)
         {
