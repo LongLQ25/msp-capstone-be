@@ -18,6 +18,7 @@ namespace MSP.Application.Services.Interfaces.Users
         Task<ApiResponse<UserDetailResponse>> GetUserDetailByIdAsync(Guid userId);
         Task<ApiResponse<IEnumerable<BusinessReponse>>> GetBusinessList(Guid curUserId);
         Task<ApiResponse<BusinessReponse>> GetBusinessDetail(Guid businessOwnerId);
+        Task<ApiResponse<string>> RemoveMemberFromOrganizationAsync(Guid businessOwnerId, Guid memberId);
 
     }
 }

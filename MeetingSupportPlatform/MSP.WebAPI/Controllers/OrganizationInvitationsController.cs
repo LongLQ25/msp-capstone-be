@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using MSP.Application.Models.Requests.OrganizationInvitatio;
 using MSP.Application.Services.Interfaces.OrganizationInvitation;
 
 namespace MSP.WebAPI.Controllers
@@ -26,24 +27,36 @@ namespace MSP.WebAPI.Controllers
 
         [HttpPost("send-invitation")]
         [Authorize(Roles = "BusinessOwner")]
-        public async Task<IActionResult> SendInvitation([FromQuery] Guid businessOwnerId, [FromQuery] string memberEmail)
+        public async Task<IActionResult> SendInvitation([FromQuery] string memberEmail)
         {
-            var result = await _organizationInvitationService.SendInvitationAsync(businessOwnerId, memberEmail);
+            var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _organizationInvitationService.SendInvitationAsync(curUserId, memberEmail);
             return Ok(result);
         }
 
-        [HttpGet("sent-invitations/{businessOwnerId}")]
+        [HttpPost("send-invitations")]
         [Authorize(Roles = "BusinessOwner")]
-        public async Task<IActionResult> GetSentInvitationsByBusinessOwnerId(Guid businessOwnerId)
+        public async Task<IActionResult> SendInvitations([FromBody] SendInvitationListRequest request)
         {
+            var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _organizationInvitationService.SendInvitationListAsync(curUserId, request.MemberEmails);
+            return Ok(result);
+        }
+
+        [HttpGet("sent-invitations")]
+        [Authorize(Roles = "BusinessOwner")]
+        public async Task<IActionResult> GetSentInvitationsByBusinessOwnerId()
+        {
+            var businessOwnerId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
             var result = await _organizationInvitationService.GetSentInvitationsByBusinessOwnerIdAsync(businessOwnerId);
             return Ok(result);
         }
-        [HttpGet("pending-requests/{businessOwnerId}")]
+        [HttpGet("pending-requests")]
         [Authorize(Roles = "BusinessOwner")]
-        public async Task<IActionResult> GetPendingRequestsByBusinessOwnerId(Guid businessOwnerId)
+        public async Task<IActionResult> GetPendingRequestsByBusinessOwnerId()
         {
-            var result = await _organizationInvitationService.GetPendingRequestsByBusinessOwnerIdAsync(businessOwnerId);
+            var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _organizationInvitationService.GetPendingRequestsByBusinessOwnerIdAsync(curUserId);
             return Ok(result);
         }
         [HttpGet("received-invitations/{memberId}")]
@@ -71,6 +84,11 @@ namespace MSP.WebAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// [BusinessOwner] Chấp nhận (accept) request từ member muốn join organization
+        /// </summary>
+        /// <param name="invitationId"></param>
+        /// <returns></returns>
         [HttpPost("accept-request/{invitationId}")]
         [Authorize(Roles = "BusinessOwner")]
         public async Task<IActionResult> AcceptRequest(Guid invitationId)
@@ -89,6 +107,9 @@ namespace MSP.WebAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// [Member] Từ chối (reject) invitation từ Business Owner
+        /// </summary>
         [HttpPost("reject-invitation/{invitationId}")]
         [Authorize(Roles = "Member")]
         public async Task<IActionResult> RejectInvitation(Guid invitationId)
@@ -97,5 +118,21 @@ namespace MSP.WebAPI.Controllers
             var result = await _organizationInvitationService.MemberRejectInvitationAsync(curUserId, invitationId);
             return Ok(result);
         }
+
+        /// <summary>
+        /// [BusinessOwner] Từ chối (reject) request xin join từ member
+        /// </summary>
+        [HttpPost("reject-request/{invitationId}")]
+        [Authorize(Roles = "BusinessOwner")]
+        public async Task<IActionResult> RejectRequest(Guid invitationId)
+        {
+            var curUserId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _organizationInvitationService.BusinessOwnerRejectRequestAsync(curUserId, invitationId);
+            if (!result.Success)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
     }
 }

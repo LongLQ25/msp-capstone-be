@@ -28,7 +28,7 @@ namespace MSP.Application.Models.Responses.OrganizationInvitation
         public string StatusDisplay => Status switch
         {
             InvitationStatus.Pending => "Pending",
-            InvitationStatus.Accepted => "Approved",
+            InvitationStatus.Accepted => "Accepted",
             InvitationStatus.Rejected => "Rejected",
             InvitationStatus.Canceled => "Canceled",
             _ => "Không xác định"

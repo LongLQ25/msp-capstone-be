@@ -20,12 +20,16 @@ namespace MSP.Application.Services.Implementations.Users
         private readonly UserManager<User> _userManager;
         private readonly INotificationService _notificationService;
         private readonly IOrganizationInviteRepository _organizationInviteRepository;
-        public UserService(UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService, IOrganizationInviteRepository organizationInviteRepository)
+        private readonly IProjectMemberRepository _projectMemberRepository;
+        private readonly IProjectRepository _projectRepository;
+        public UserService(UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService, IOrganizationInviteRepository organizationInviteRepository, IProjectMemberRepository projectMemberRepository, IProjectRepository projectRepository)
         {
             _userManager = userManager;
             _userRepository = userRepository;
             _notificationService = notificationService;
             _organizationInviteRepository = organizationInviteRepository;
+            _projectMemberRepository = projectMemberRepository;
+            _projectRepository = projectRepository;
         }
 
         public async Task<ApiResponse<IEnumerable<UserResponse>>> GetBusinessOwnersAsync()
@@ -377,6 +381,55 @@ namespace MSP.Application.Services.Implementations.Users
                 ProjectCount = projectCount,
             };
             return ApiResponse<BusinessReponse>.SuccessResponse(response, "Business owner details retrieved successfully.");
+        }
+
+        public async Task<ApiResponse<string>> RemoveMemberFromOrganizationAsync(Guid businessOwnerId, Guid memberId)
+        {
+            try
+            {
+                // 1. Lấy member
+                var member = await _userManager.FindByIdAsync(memberId.ToString());
+                if (member == null)
+                    return ApiResponse<string>.ErrorResponse("Member not found.");
+
+                // 2. Kiểm tra member thuộc tổ chức của BO không
+                if (member.ManagedById != businessOwnerId || string.IsNullOrEmpty(member.Organization))
+                    return ApiResponse<string>.ErrorResponse("This member does not belong to your organization.");
+
+                var oldOrganization = member.Organization;
+
+                // 3. Set lại Organization và ManagedById = null
+                member.Organization = null;
+                member.ManagedById = null;
+
+                var updateResult = await _userManager.UpdateAsync(member);
+                if (!updateResult.Succeeded)
+                    return ApiResponse<string>.ErrorResponse("Failed to remove member from organization.");
+
+                // 4. Tìm các project thuộc tổ chức của BO
+                var projectIds = await _projectRepository.GetProjectIdsByOwnerIdAsync(businessOwnerId);
+
+                // 5. Lấy các ProjectMember active có member này tham gia trong các project đó
+                var projectMemberships = await _projectMemberRepository.GetActiveMembershipsByMemberAndProjectsAsync(memberId, projectIds);
+
+                // 6. Cập nhật LeftAt = now
+                var now = DateTime.UtcNow;
+                foreach (var pm in projectMemberships)
+                {
+                    pm.LeftAt = now;
+                }
+                await _projectMemberRepository.UpdateRangeAsync(projectMemberships);
+                await _projectMemberRepository.SaveChangesAsync();
+
+                return ApiResponse<string>.SuccessResponse(
+                    $"Removed member from organization and updated {projectMemberships.Count} project(s).",
+                    "Member removed successfully."
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<string>.ErrorResponse($"Error removing member from organization: {ex.Message}");
+            }
         }
     }
 }

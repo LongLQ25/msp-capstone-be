@@ -100,6 +100,42 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             }
         }
 
+        public async Task<ApiResponse<string>> BusinessOwnerRejectRequestAsync(Guid businessOwnerId, Guid invitationId)
+        {
+            try
+            {
+                // 1. Lấy request
+                var request = await _organizationInviteRepository.GetByIdAsync(invitationId);
+                if (request == null)
+                    return ApiResponse<string>.ErrorResponse("Request not found.");
+
+                // 2. Kiểm tra đúng BO và là Request
+                if (request.BusinessOwnerId != businessOwnerId)
+                    return ApiResponse<string>.ErrorResponse("You are not authorized to reject this request.");
+                if (request.Type != InvitationType.Request)
+                    return ApiResponse<string>.ErrorResponse("This is not a join request.");
+
+                if (request.Status != InvitationStatus.Pending)
+                    return ApiResponse<string>.ErrorResponse($"This request is already {request.Status}.");
+
+                // 3. Đánh dấu reject
+                request.Status = InvitationStatus.Rejected;
+                request.RespondedAt = DateTime.UtcNow;
+                await _organizationInviteRepository.UpdateAsync(request);
+
+                // (Optional) Gửi notification cho member (Chưa handle)
+
+                return ApiResponse<string>.SuccessResponse(
+                    "Join request has been rejected.",
+                    "Request rejected successfully."
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<string>.ErrorResponse($"Error rejecting request: {ex.Message}");
+            }
+        }
+
         // BO xem requests cần duyệt từ members
         public async Task<ApiResponse<IEnumerable<OrganizationInvitationResponse>>> GetPendingRequestsByBusinessOwnerIdAsync(Guid businessOwnerId)
         {
@@ -463,7 +499,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             }
 
             // Find member by email
-            var member = await _userManager.FindByEmailAsync(memberEmail);
+            var member = await _userManager.FindByEmailAsync(memberEmail.ToUpper());
             if (member == null)
             {
                 return ApiResponse<bool>.ErrorResponse(false,
@@ -524,7 +560,24 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             return ApiResponse<bool>.SuccessResponse(true, "Invitation sent successfully.");
         }
 
-
+        public async Task<ApiResponse<List<SendInvitationResult>>> SendInvitationListAsync(Guid businessOwnerId, List<string> memberEmails)
+        {
+            var results = new List<SendInvitationResult>();
+            foreach (var memberEmail in memberEmails.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var result = await SendInvitationAsync(businessOwnerId, memberEmail);
+                results.Add(new SendInvitationResult
+                {
+                    Email = memberEmail,
+                    Success = result.Success && result.Data,
+                    Message = result.Message
+                });
+            }
+            return ApiResponse<List<SendInvitationResult>>.SuccessResponse(
+                results,
+                "Invitations processed."
+            );
+        }
 
     }
 }

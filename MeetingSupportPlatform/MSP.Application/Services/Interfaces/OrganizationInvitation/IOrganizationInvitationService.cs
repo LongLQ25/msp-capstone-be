@@ -12,6 +12,7 @@ namespace MSP.Application.Services.Interfaces.OrganizationInvitation
     {
         //Business Owner sends invitation to a member
         Task<ApiResponse<bool>> SendInvitationAsync(Guid businessOwnerId, string memberEmail);
+        Task<ApiResponse<List<SendInvitationResult>>> SendInvitationListAsync(Guid businessOwnerId, List<string> memberEmails);
         //Member requests to join an organization
         Task<ApiResponse<bool>> RequestJoinOrganizeAsync(Guid memberId, Guid businessOwnerId);
         // BO xem invitations đã gửi cho members
@@ -37,6 +38,8 @@ namespace MSP.Application.Services.Interfaces.OrganizationInvitation
         // Member reject Invitation từ BO
         Task<ApiResponse<string>> MemberRejectInvitationAsync(Guid memberId, Guid invitationId);
 
+        // BO reject join request từ Member
+        Task<ApiResponse<string>> BusinessOwnerRejectRequestAsync(Guid businessOwnerId, Guid invitationId);
 
     }
 }

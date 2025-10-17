@@ -7,5 +7,6 @@ namespace MSP.Application.Repositories
     {
         Task<IEnumerable<ProjectMember>> GetProjectMembersByProjectIdAsync(Guid projectId);
         Task<List<ProjectMember>> GetActiveMembershipsByMemberIdAsync(Guid memberId);
+        Task<List<ProjectMember>> GetActiveMembershipsByMemberAndProjectsAsync(Guid memberId, List<Guid> projectIds);
     }
 }

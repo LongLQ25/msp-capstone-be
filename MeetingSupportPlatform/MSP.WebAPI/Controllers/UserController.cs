@@ -97,7 +97,17 @@ namespace MSP.WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpPost("remove-member/{memberId}")]
+        [Authorize(Roles = "BusinessOwner")]
+        public async Task<IActionResult> RemoveMemberFromOrganization(Guid memberId)
+        {
+            var businessOwnerId = Guid.Parse(User.Claims.First(c => c.Type == "userId").Value);
+            var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
+            if (!result.Success)
+                return BadRequest(result);
 
+            return Ok(result);
+        }
 
     }
 }
