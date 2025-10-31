@@ -11,5 +11,6 @@ namespace MSP.Application.Repositories
     public interface ITodoRepository : IGenericRepository<Todo, Guid>
     {
         Task<IEnumerable<Todo>> GetTodoByMeetingId(Guid meetingId);
+        Task<Todo> GetByIdAsync(Guid id);
     }
 }

@@ -14,11 +14,20 @@ namespace MSP.Infrastructure.Repositories
     {
         public async Task<IEnumerable<Todo>> GetTodoByMeetingId(Guid meetingId)
         {
-            var todos = await _context.Todos.Where(t => t.MeetingId == meetingId)
+            var todos = await _context.Todos.Where(t => t.MeetingId == meetingId && t.IsDeleted != true)
                 .Include(t => t.User)
                 .ToListAsync();
             return todos;
 
+        }
+
+        public async Task<Todo> GetByIdAsync(Guid id)
+        {
+            var todo = await _context.Todos
+                .Where(t => t.Id == id)
+                .Include(t => t.Meeting)
+                .FirstOrDefaultAsync();
+            return todo;
         }
     }
 }
