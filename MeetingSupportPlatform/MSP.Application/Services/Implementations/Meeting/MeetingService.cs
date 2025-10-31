@@ -210,5 +210,17 @@ namespace MSP.Application.Services.Implementations.Meeting
                 }).ToList() ?? new List<AttendeeResponse>()
             };
         }
+
+        public async Task<ApiResponse<string>> UpdateTranscriptAsync(Guid meetingId, string transcription)
+        {
+            var meeting = await _meetingRepository.GetMeetingByIdAsync(meetingId);
+            if (meeting == null)
+                return ApiResponse<string>.ErrorResponse("updateFailed", "Meeting not found");
+            meeting.Transcription = transcription;
+            meeting.UpdatedAt = DateTime.UtcNow;
+            await _meetingRepository.UpdateAsync(meeting);
+            await _meetingRepository.SaveChangesAsync();
+            return ApiResponse<string>.SuccessResponse("updateSuccess", "Meeting transcription updated successfully");
+        }
     }
 }
