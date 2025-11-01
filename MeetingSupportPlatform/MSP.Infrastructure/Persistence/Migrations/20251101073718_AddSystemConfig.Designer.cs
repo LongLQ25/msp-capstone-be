@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MSP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251016131357_OrganizationInvitation")]
-    partial class OrganizationInvitation
+    [Migration("20251101073718_AddSystemConfig")]
+    partial class AddSystemConfig
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -158,7 +158,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("EndTime")
+                    b.Property<DateTime?>("EndTime")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
@@ -432,6 +432,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LeftAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uuid");
 
@@ -488,7 +491,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -708,19 +711,19 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c1d2e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "db534b55-fd97-45f4-bd74-789e25511cd9",
+                            ConcurrencyStamp = "884508e8-d3b6-452b-968a-a5dc3c9fdd12",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@gmail.com",
                             EmailConfirmed = true,
-                            FullName = "Admin-Nguyễn Văn An",
+                            FullName = "Nguyen Van An",
                             IsActive = true,
                             IsApproved = false,
                             LockoutEnabled = false,
                             NormalizedEmail = "ADMIN@GMAIL.COM",
                             NormalizedUserName = "ADMIN",
-                            PasswordHash = "AQAAAAIAAYagAAAAECrA3BOZYcl99Z2J39OL/ra/WZJNb7K7drFapOQYo0AejU9PX7H2OVOTZhij39Eu4Q==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEKe5eooKnng2HUR6AKwWcci/0LZeKYUm2IFbFhbMO39T0b2MFzcrPmWSNPDd+J+dmg==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "3516f4f7-a6a2-4523-b4c8-c6ffe2af4e95",
+                            SecurityStamp = "47207a18-b468-4282-9775-7b28ebc12ad3",
                             TwoFactorEnabled = false,
                             UserName = "admin"
                         },
@@ -728,39 +731,99 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c2d4e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "f137afa1-4efb-45b2-ac7e-415075f45ddc",
+                            ConcurrencyStamp = "dd527856-e4c8-461d-99d0-13841242929f",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Email = "member@gmail.com",
+                            Email = "member1@gmail.com",
                             EmailConfirmed = true,
-                            FullName = "Member-Lê Thị Thúy",
+                            FullName = "Le Thi Thuy",
                             IsActive = true,
                             IsApproved = false,
                             LockoutEnabled = false,
-                            NormalizedEmail = "MEMBER@GMAIL.COM",
+                            NormalizedEmail = "MEMBER1@GMAIL.COM",
                             NormalizedUserName = "MEMBER",
-                            PasswordHash = "AQAAAAIAAYagAAAAEO7PKUuk/VhRghafrxegIa/W1E4oGrJa2TZiZfXgzM4bjMMGPyIqqaD77tfUfrHHyg==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEEBMUuHshGNCEaoE+x70bfmf5jd7XPrwrxwJjnqvgHOCV8sXeusgTP0K8PxEZIuUgQ==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "cf483dd8-b600-4e12-b6d8-1c651019a981",
+                            SecurityStamp = "6b2c9540-6c4d-4cd2-b846-51ca6dca92fc",
                             TwoFactorEnabled = false,
                             UserName = "Member"
                         },
                         new
                         {
-                            Id = new Guid("c3d4e3f4-a5b6-4789-1234-56789abcdef2"),
+                            Id = new Guid("d2a5b3c4-d7e8-4789-1234-56789abcdef3"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "a198e953-4c26-4250-82b2-c0b36da71f5f",
+                            ConcurrencyStamp = "b7ddc14c-1d40-437d-89b8-90c0e505479f",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Email = "manager@gmail.com",
+                            Email = "member2@gmail.com",
                             EmailConfirmed = true,
-                            FullName = "ProjectManager-Trần Văn Bình",
+                            FullName = "Pham Minh Hieu",
                             IsActive = true,
                             IsApproved = false,
                             LockoutEnabled = false,
-                            NormalizedEmail = "MANAGER@GMAIL.COM",
-                            NormalizedUserName = "PROJECTMANAGER",
-                            PasswordHash = "AQAAAAIAAYagAAAAEPqN4xLFnZi5weJREwfyAn55KSN1gMygd7Z6/vr4IsTnGeMwrKGtZTZE/PvCcZSKxA==",
+                            NormalizedEmail = "MEMBER2@GMAIL.COM",
+                            NormalizedUserName = "MEMBER2",
+                            PasswordHash = "AQAAAAIAAYagAAAAEB5ngMxGuE34kOIrrfgZKU1Rxcvjlf6ChHR6u9Vgj64JRPOqn+9nfNTCb0yLg0fUkw==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "de944b84-baa1-4392-9523-7419101eb27d",
+                            SecurityStamp = "718577a8-a6b6-4436-b346-83c1b4471fb6",
+                            TwoFactorEnabled = false,
+                            UserName = "Member2"
+                        },
+                        new
+                        {
+                            Id = new Guid("e3b6c7d8-a9f0-4789-1234-56789abcdef4"),
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "a404ef19-c6e8-4be3-9084-3e898674410b",
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "member3@gmail.com",
+                            EmailConfirmed = true,
+                            FullName = "Nguyen Bao Chau",
+                            IsActive = true,
+                            IsApproved = false,
+                            LockoutEnabled = false,
+                            NormalizedEmail = "MEMBER2@GMAIL.COM",
+                            NormalizedUserName = "MEMBER3",
+                            PasswordHash = "AQAAAAIAAYagAAAAEDi5aOMpNZu6j2q61zzWyAswAFqPeD23Ncsqni//Ph94PixJLAS1C0el3vb9E8kV5g==",
+                            PhoneNumberConfirmed = false,
+                            SecurityStamp = "c99424da-b08d-40ee-82eb-2276bed32bc8",
+                            TwoFactorEnabled = false,
+                            UserName = "Member3"
+                        },
+                        new
+                        {
+                            Id = new Guid("f4c7d8e9-b1a2-4789-1234-56789abcdef5"),
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "291bbf80-71fd-4564-90b8-bb82c7d82707",
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "member4@gmail.com",
+                            EmailConfirmed = true,
+                            FullName = "Do Thi Lan Anh",
+                            IsActive = true,
+                            IsApproved = false,
+                            LockoutEnabled = false,
+                            NormalizedEmail = "MEMBER4@GMAIL.COM",
+                            NormalizedUserName = "MEMBER4",
+                            PasswordHash = "AQAAAAIAAYagAAAAECH+N3NUqbDoN/pZ3Ir9DeX89e0iUag/pYtsfOOzeEQe3zqvgmb+XZiOghJgj8DulA==",
+                            PhoneNumberConfirmed = false,
+                            SecurityStamp = "ab1299e0-22fb-4e45-823c-c752a46e7a5a",
+                            TwoFactorEnabled = false,
+                            UserName = "Member4"
+                        },
+                        new
+                        {
+                            Id = new Guid("c3d4e3f4-a5b6-4789-1234-56789abcdef2"),
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "64f6fd4d-8939-44f2-b325-f3d7ac071320",
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "pm@gmail.com",
+                            EmailConfirmed = true,
+                            FullName = "Tran Van Binh",
+                            IsActive = true,
+                            IsApproved = false,
+                            LockoutEnabled = false,
+                            NormalizedEmail = "PM@GMAIL.COM",
+                            NormalizedUserName = "PROJECTMANAGER",
+                            PasswordHash = "AQAAAAIAAYagAAAAEEZi99ZdTaw0AXsa4kqQDae7DbfdzaoqLM3/L+iVVwXj/afmhJ+jI+4QEQtKxtVd3g==",
+                            PhoneNumberConfirmed = false,
+                            SecurityStamp = "30757fd6-25c3-4272-a85d-599318ec19ad",
                             TwoFactorEnabled = false,
                             UserName = "ProjectManager"
                         },
@@ -768,22 +831,64 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c4d4e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "a2d0e35a-7850-4920-80b9-27e8c5931f47",
+                            ConcurrencyStamp = "d798eee3-002a-44e7-827c-eb46f3769af1",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Email = "businessowner@gmail.com",
+                            Email = "bo1@gmail.com",
                             EmailConfirmed = true,
-                            FullName = "BusinessOwner-Ngô Văn Thanh",
+                            FullName = "Ngo Van Thanh",
                             IsActive = true,
                             IsApproved = true,
                             LockoutEnabled = false,
-                            NormalizedEmail = "BUSINESSOWNER@GMAIL.COM",
+                            NormalizedEmail = "BO1@GMAIL.COM",
                             NormalizedUserName = "BUSINESSOWNER",
                             Organization = "FPT Software",
-                            PasswordHash = "AQAAAAIAAYagAAAAEOL7UMtzYAwJRN/H3Z27+wpq14RcFESj+wZ+LrQJ9uJ15WlbGlVHauZbDbkpvMyzRQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEOW2BWouD45+L4X/RqBSuJ0ZIbaQwRXB60Uv16yrVqIkW8BRLaeDfYDTkvFz/dQpcw==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "91e2cad6-c450-454b-8173-c837b3b5f0cd",
+                            SecurityStamp = "40da04c2-414c-4c33-b7e1-e2f3c76ee286",
                             TwoFactorEnabled = false,
                             UserName = "BusinessOwner"
+                        },
+                        new
+                        {
+                            Id = new Guid("a5b6c7d8-e9f0-4789-1234-56789abcdef6"),
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "063a84f9-facf-4c32-86de-1974ad9daaa1",
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "bo2@gmail.com",
+                            EmailConfirmed = true,
+                            FullName = "Hoang Thi Hong",
+                            IsActive = true,
+                            IsApproved = true,
+                            LockoutEnabled = false,
+                            NormalizedEmail = "BO2@GMAIL.COM",
+                            NormalizedUserName = "BUSINESSOWNER2",
+                            Organization = "VNPT Technology",
+                            PasswordHash = "AQAAAAIAAYagAAAAEIjOiFBt6msS43Mew1YqtiyhcxJDgX+9IQg9coH75JBNwKAeUx0k/F73DY/e8X1IdQ==",
+                            PhoneNumberConfirmed = false,
+                            SecurityStamp = "2781feb1-8736-4808-9cc6-bce628c56a09",
+                            TwoFactorEnabled = false,
+                            UserName = "BusinessOwner2"
+                        },
+                        new
+                        {
+                            Id = new Guid("b6c7d8e9-f0a1-4789-1234-56789abcdef7"),
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "82a50549-6f7f-4ce4-a0b4-7b7b2358c248",
+                            CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "bo3@gmail.com",
+                            EmailConfirmed = true,
+                            FullName = "Le Van Phuc",
+                            IsActive = true,
+                            IsApproved = true,
+                            LockoutEnabled = false,
+                            NormalizedEmail = "BO3@GMAIL.COM",
+                            NormalizedUserName = "BUSINESSOWNER3",
+                            Organization = "CMC Corporation",
+                            PasswordHash = "AQAAAAIAAYagAAAAECtgR2Yoz/LyjJ0NZpzVU/7f4f/ZOR95jD6Ri2QPE9dFLYsgsadXV2KTweZKLdnbzw==",
+                            PhoneNumberConfirmed = false,
+                            SecurityStamp = "8bcbfc61-3373-46c7-8063-505a419600d9",
+                            TwoFactorEnabled = false,
+                            UserName = "BusinessOwner3"
                         });
                 });
 
@@ -1188,8 +1293,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.HasOne("MSP.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Project");
 
