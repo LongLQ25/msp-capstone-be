@@ -28,7 +28,7 @@ namespace MSP.Infrastructure.Persistence.DBContext
         public DbSet<Limitation> Limitations { get; set; }
         public DbSet<Subscription> Subscriptions { get; set; }
         public DbSet<OrganizationInvitation> OrganizationInvitations { get; set; }
-
+        public DbSet<TaskReassignRequest> TaskReassignRequests { get; set; }
 
 
 
@@ -251,6 +251,30 @@ namespace MSP.Infrastructure.Persistence.DBContext
                 entity.HasIndex(e => new { e.BusinessOwnerId, e.Status });
                 entity.HasIndex(e => new { e.MemberId, e.Status });
                 entity.HasIndex(e => e.Type);
+            });
+
+            // TaskReassignRequest
+            builder.Entity<TaskReassignRequest>(entity =>
+            {
+                entity.HasOne(r => r.Task)
+                    .WithMany(t => t.TaskReassignRequests)
+                    .HasForeignKey(r => r.TaskId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(r => r.FromUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.FromUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.ToUser)
+                    .WithMany()
+                    .HasForeignKey(r => r.ToUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(r => r.Status)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
             });
         }
     }
