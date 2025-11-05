@@ -16,6 +16,7 @@ namespace MSP.Domain.Entities
         public string Status { get; set; } = TaskReassignEnum.Pending.ToString(); // PENDING / ACCEPTED / REJECTED
         public string Description { get; set; }  
         public DateTime? RespondedAt { get; set; }
+        public string? ResponseMessage { get; set; }
         public virtual ProjectTask Task { get; set; }
         public virtual User FromUser { get; set; }
         public virtual User ToUser { get; set; }
