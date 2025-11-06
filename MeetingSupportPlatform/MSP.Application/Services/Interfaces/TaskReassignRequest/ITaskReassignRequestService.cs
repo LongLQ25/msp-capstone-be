@@ -16,6 +16,7 @@ namespace MSP.Application.Services.Interfaces.TaskReassignRequest
         Task<ApiResponse<IEnumerable<GetUserResponse>>> GetAvailableUsersForReassignmentAsync(Guid taskId, Guid fromUserId);
         Task<ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>> GetTaskReassignRequestsForUserAsync(Guid userId);
         Task<ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>> GetTaskReassignRequestsByTaskIdAsync(Guid taskId);
+        Task<ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>> GetAcceptedTaskReassignRequestsByTaskIdAsync(Guid taskId);
         Task<ApiResponse<GetTaskReassignRequestResponse>> CreateTaskReassignRequest(CreateTaskReassignRequestRequest request);
         Task<ApiResponse<GetTaskReassignRequestResponse>> AcceptTaskReassignRequest(Guid taskReassignRequestId, UpdateTaskReassignRequestRequest request);
         Task<ApiResponse<GetTaskReassignRequestResponse>> RejectTaskReassignRequest(Guid taskReassignRequestId, UpdateTaskReassignRequestRequest request);

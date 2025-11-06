@@ -82,6 +82,21 @@ namespace MSP.WebAPI.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [HttpGet("accepted-by-task/{taskId}")]
+        public async Task<IActionResult> GetAcceptedTaskReassignRequestsByTaskId([FromRoute] Guid taskId)
+        {
+            try
+            {
+                var result = await _taskReassignRequestService.GetAcceptedTaskReassignRequestsByTaskIdAsync(taskId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [HttpGet("for-user/{userId}")]
         public async Task<IActionResult> GetTaskReassignRequestsForUser([FromRoute] Guid userId)
         {
