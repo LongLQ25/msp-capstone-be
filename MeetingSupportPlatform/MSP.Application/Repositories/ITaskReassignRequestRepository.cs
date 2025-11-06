@@ -12,6 +12,8 @@ namespace MSP.Application.Repositories
     {
         Task<TaskReassignRequest?> GetTaskReassignRequestByIdAsync(Guid id);
         Task<IEnumerable<TaskReassignRequest>> GetTaskReassignRequestsByTaskIdAsync(Guid taskId);
+        Task<IEnumerable<TaskReassignRequest>> GetAcceptedTaskReassignRequestsByTaskIdAsync(Guid taskId);
         Task<IEnumerable<TaskReassignRequest>> GetTaskReassignRequestsForUserAsync(Guid userId);
+
     }
 }

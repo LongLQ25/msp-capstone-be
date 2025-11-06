@@ -94,7 +94,7 @@ namespace MSP.Application.Services.Implementations.TaskReassignRequest
                     PhoneNumber = taskReassignRequest.ToUser.PhoneNumber
                 }
             };
-            return ApiResponse<GetTaskReassignRequestResponse>.SuccessResponse(rs);
+            return ApiResponse<GetTaskReassignRequestResponse>.SuccessResponse(rs, "Bạn đã chấp nhận yêu cầu chuyển giao công việc");
 
         }
 
@@ -185,7 +185,7 @@ namespace MSP.Application.Services.Implementations.TaskReassignRequest
                 var user = member.Member;
                 var roles = await _userManager.GetRolesAsync(user);
 
-                if (roles.Contains("Member"))
+                if (roles.Contains(UserRoleEnum.Member.ToString()))
                 {
                     potentialUsers.Add(user);
                 }
@@ -263,6 +263,53 @@ namespace MSP.Application.Services.Implementations.TaskReassignRequest
             return ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>.SuccessResponse(rs, "Fetch history task reassign request for task successfully");
         }
 
+
+        public async Task<ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>> GetAcceptedTaskReassignRequestsByTaskIdAsync(Guid taskId)
+        {
+            var requests = await _taskReassignRequestRepo.GetAcceptedTaskReassignRequestsByTaskIdAsync(taskId);
+            var rs = requests.Select(trr => new GetTaskReassignRequestResponse
+            {
+                Id = trr.Id,
+                TaskId = trr.TaskId,
+                FromUserId = trr.FromUserId,
+                ToUserId = trr.ToUserId,
+                Status = trr.Status,
+                Description = trr.Description,
+                RespondedAt = trr.RespondedAt,
+                CreatedAt = trr.CreatedAt,
+                ResponseMessage = trr.ResponseMessage,
+                Task = new GetTaskResponse
+                {
+                    Id = trr.Task!.Id,
+                    Title = trr.Task.Title,
+                    Description = trr.Task.Description,
+                    StartDate = trr.Task.StartDate,
+                    EndDate = trr.Task.EndDate,
+                    Status = trr.Task.Status,
+                    UserId = trr.Task.UserId,
+                    ProjectId = trr.Task.ProjectId
+                },
+                FromUser = new GetUserResponse
+                {
+                    Id = trr.FromUser.Id,
+                    UserName = trr.FromUser.UserName,
+                    FullName = trr.FromUser.FullName,
+                    Email = trr.FromUser.Email,
+                    AvatarUrl = trr.FromUser.AvatarUrl,
+                    PhoneNumber = trr.FromUser.PhoneNumber
+                },
+                ToUser = new GetUserResponse
+                {
+                    Id = trr.ToUser.Id,
+                    UserName = trr.ToUser.UserName,
+                    FullName = trr.ToUser.FullName,
+                    Email = trr.ToUser.Email,
+                    AvatarUrl = trr.ToUser.AvatarUrl,
+                    PhoneNumber = trr.ToUser.PhoneNumber
+                }
+            });
+            return ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>.SuccessResponse(rs, "Fetch history task reassign request for task successfully");
+        }
         public async Task<ApiResponse<IEnumerable<GetTaskReassignRequestResponse>>> GetTaskReassignRequestsForUserAsync(Guid userId)
         {
             var requests = await _taskReassignRequestRepo.GetTaskReassignRequestsForUserAsync(userId);

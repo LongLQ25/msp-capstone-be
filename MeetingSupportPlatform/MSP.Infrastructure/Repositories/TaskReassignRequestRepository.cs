@@ -2,6 +2,7 @@
 using MSP.Application.Repositories;
 using MSP.Domain.Entities;
 using MSP.Infrastructure.Persistence.DBContext;
+using MSP.Shared.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,7 +29,19 @@ namespace MSP.Infrastructure.Repositories
                 .Include(r => r.FromUser)
                 .Include(r => r.ToUser)
                 .Where(r => r.TaskId == taskId && !r.IsDeleted)
-                .OrderBy(r => r.CreatedAt)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+        }
+        public async Task<IEnumerable<TaskReassignRequest>> GetAcceptedTaskReassignRequestsByTaskIdAsync(Guid taskId)
+        {
+            return await _context.TaskReassignRequests
+                .Include(r => r.Task)
+                .Include(r => r.FromUser)
+                .Include(r => r.ToUser)
+                .Where(r => r.TaskId == taskId
+                            && !r.IsDeleted
+                            && r.Status == TaskReassignEnum.Accepted.ToString())
+                .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }
 
@@ -39,7 +52,7 @@ namespace MSP.Infrastructure.Repositories
                 .Include(r => r.FromUser)
                 .Include(r => r.ToUser)
                 .Where(r => (r.FromUserId == userId || r.ToUserId == userId) && !r.IsDeleted)
-                .OrderBy(r => r.CreatedAt)
+                .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }
     }
