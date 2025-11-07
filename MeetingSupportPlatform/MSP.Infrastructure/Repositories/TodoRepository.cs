@@ -12,6 +12,7 @@ namespace MSP.Infrastructure.Repositories
             var todos = await _context.Todos.Where(t => t.MeetingId == meetingId && t.IsDeleted != true &&  t.Status != Shared.Enums.TodoStatus.Deleted)
                 .Include(t => t.User)
                 .Include(t => t.ReferencedTasks)
+                .OrderBy(t => t.CreatedAt)
                 .ToListAsync();
             return todos;
 
