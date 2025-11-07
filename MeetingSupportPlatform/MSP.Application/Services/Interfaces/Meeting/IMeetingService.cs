@@ -20,6 +20,7 @@ namespace MSP.Application.Services.Interfaces.Meeting
         Task<ApiResponse<GetMeetingResponse>> GetMeetingByIdAsync(Guid meetingId);
         Task<ApiResponse<List<GetMeetingResponse>>> GetMeetingsByProjectIdAsync(Guid projectId);
         Task<ApiResponse<string>> FinishMeetingAsync(Guid meetingId, DateTime endTime);
+        Task<ApiResponse<string>> UpdateTranscriptAsync(Guid meetingId, string transcription);
 
 
     }

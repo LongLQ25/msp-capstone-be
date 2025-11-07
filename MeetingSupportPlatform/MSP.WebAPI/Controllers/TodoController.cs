@@ -58,6 +58,15 @@ namespace MSP.WebAPI.Controllers
             var result = await _todoService.GetTodoByMeetingIdAsync(meetingId);
             return Ok(result);
         }
+
+        [HttpPost("convert-to-tasks")]
+        public async Task<IActionResult> ConvertTodosToTasks([FromBody] ConvertTodosToTasksRequest request)
+        {
+            if (request?.TodoIds == null || !request.TodoIds.Any())
+                return BadRequest("No TodoIds provided");
+            var results = await _todoService.ConvertTodosToTasksAsync(request.TodoIds);
+            return Ok(results);
+        }
     }
 
 }

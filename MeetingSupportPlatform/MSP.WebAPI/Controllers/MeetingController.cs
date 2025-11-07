@@ -101,5 +101,12 @@ namespace MSP.WebAPI.Controllers
             }
             return Ok(response);
         }
+
+        [HttpPut("{meetingId}/transcript")]
+        public async Task<IActionResult> UpdateMeetingTranscript([FromRoute] Guid meetingId, [FromBody] string transcription)
+        {
+            var rs = await _meetingService.UpdateTranscriptAsync(meetingId, transcription);
+            return Ok(rs);
+        }
     }
 }
