@@ -135,7 +135,7 @@ namespace MSP.Application.Services.Implementations.Auth
 
             if (existingUser != null)
             {
-                // User exists, check approval status
+                // User exists, generate tokens and return
                 var existingRoles = (await _userManager.GetRolesAsync(existingUser)).ToArray();
                 var (existingJwtToken, existingExpiresAtUtc) = _authTokenProcessor.GenerateJwtToken(existingUser, existingRoles);
                 var existingRefreshToken = _authTokenProcessor.GenerateRefreshToken();
@@ -143,14 +143,16 @@ namespace MSP.Application.Services.Implementations.Auth
                 existingUser.RefreshToken = existingRefreshToken;
                 existingUser.RefreshTokenExpiresAtUtc = existingRefreshTokenExpiry;
                 await _userManager.UpdateAsync(existingUser);
+                
                 _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("ACCESS_TOKEN", existingJwtToken, existingExpiresAtUtc);
                 _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("REFRESH_TOKEN", existingRefreshToken, existingRefreshTokenExpiry);
+                
                 var existingResponse = new LoginResponse
                 {
                     AccessToken = existingJwtToken,
                     RefreshToken = existingRefreshToken
                 };
-                return ApiResponse<LoginResponse>.SuccessResponse(existingResponse, "Google login successful.");
+                return ApiResponse<LoginResponse>.SuccessResponse(existingResponse, "Đăng nhập Google thành công.");
             }
 
             // Check if user exists by email but not Google ID (merge accounts)
@@ -170,17 +172,96 @@ namespace MSP.Application.Services.Implementations.Auth
                 userByEmail.RefreshToken = emailRefreshToken;
                 userByEmail.RefreshTokenExpiresAtUtc = emailRefreshTokenExpiry;
                 await _userManager.UpdateAsync(userByEmail);
+                
                 _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("ACCESS_TOKEN", emailJwtToken, emailExpiresAtUtc);
                 _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("REFRESH_TOKEN", emailRefreshToken, emailRefreshTokenExpiry);
+                
                 var emailResponse = new LoginResponse
                 {
                     AccessToken = emailJwtToken,
                     RefreshToken = emailRefreshToken
                 };
-                return ApiResponse<LoginResponse>.SuccessResponse(emailResponse, "Google account linked successfully.");
+                return ApiResponse<LoginResponse>.SuccessResponse(emailResponse, "Tài khoản Google đã được liên kết thành công.");
             }
 
-            return ApiResponse<LoginResponse>.ErrorResponse(null, "Account doesn't exist in system.");
+            // User doesn't exist - Auto register as Member
+            var fullName = $"{googleLoginRequest.FirstName} {googleLoginRequest.LastName}".Trim();
+            if (string.IsNullOrWhiteSpace(fullName))
+            {
+                fullName = googleLoginRequest.Email.Split('@')[0]; // Fallback to email prefix
+            }
+
+            var newUser = new User
+            {
+                Email = googleLoginRequest.Email,
+                UserName = googleLoginRequest.Email,
+                FullName = fullName,
+                GoogleId = googleLoginRequest.GoogleId,
+                Provider = "Google",
+                AvatarUrl = googleLoginRequest.AvatarUrl,
+                SecurityStamp = Guid.NewGuid().ToString(),
+                EmailConfirmed = true, // Google accounts are pre-verified
+                CreatedAt = DateTime.UtcNow,
+                IsApproved = true, // Member được approve ngay
+                IsActive = true
+            };
+
+            // Create user without password (Google OAuth)
+            var createResult = await _userManager.CreateAsync(newUser);
+            if (!createResult.Succeeded)
+            {
+                var errors = createResult.Errors.Select(e => e.Description);
+                return ApiResponse<LoginResponse>.ErrorResponse(null, "Không thể tạo tài khoản người dùng.", errors);
+            }
+
+            // Thêm user vào role Member
+            var addRoleResult = await _userManager.AddToRoleAsync(newUser, UserRoleEnum.Member.ToString());
+            if (!addRoleResult.Succeeded)
+            {
+                // Rollback: xóa user đã tạo nếu không thêm được role
+                await _userManager.DeleteAsync(newUser);
+                var errors = addRoleResult.Errors.Select(e => e.Description);
+                return ApiResponse<LoginResponse>.ErrorResponse(null, "Không thể gán quyền cho người dùng.", errors);
+            }
+
+            // Generate tokens for new user
+            var roles = new[] { UserRoleEnum.Member.ToString() };
+            var (jwtToken, expiresAtUtc) = _authTokenProcessor.GenerateJwtToken(newUser, roles);
+            var refreshToken = _authTokenProcessor.GenerateRefreshToken();
+            var refreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            
+            newUser.RefreshToken = refreshToken;
+            newUser.RefreshTokenExpiresAtUtc = refreshTokenExpiry;
+            await _userManager.UpdateAsync(newUser);
+
+            _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("ACCESS_TOKEN", jwtToken, expiresAtUtc);
+            _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("REFRESH_TOKEN", refreshToken, refreshTokenExpiry);
+
+            // Tạo notification in-app chào mừng user mới
+            try
+            {
+                await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
+                {
+                    UserId = newUser.Id,
+                    Title = "Chào mừng đến với MSP",
+                    Message = $"Hi {newUser.FullName}, chào mừng bạn đến với nền tảng hỗ trợ các cuộc họp! Tài khoản của bạn đã được tạo thành công thông qua Google.",
+                    Type = NotificationTypeEnum.InApp.ToString(),
+                    Data = $"{{\"eventType\":\"GoogleAccountCreated\",\"userId\":\"{newUser.Id}\",\"provider\":\"Google\"}}"
+                });
+            }
+            catch (Exception)
+            {
+                // Log error nhưng không fail request vì notification không critical
+                // Notification failure không ảnh hưởng đến flow đăng ký
+            }
+
+            var response = new LoginResponse
+            {
+                AccessToken = jwtToken,
+                RefreshToken = refreshToken
+            };
+
+            return ApiResponse<LoginResponse>.SuccessResponse(response, "Tài khoản Google đã được đăng ký và đăng nhập thành công.");
         }
 
         public async Task<ApiResponse<RefreshTokenResponse>> RefreshTokenAsync(string? refreshToken)
