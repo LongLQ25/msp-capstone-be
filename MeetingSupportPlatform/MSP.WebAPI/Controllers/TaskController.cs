@@ -110,5 +110,17 @@ namespace MSP.WebAPI.Controllers
             }
             return Ok(response);
         }
+
+        [HttpGet("by-todo/{id}")]
+        public async Task<IActionResult> GetTasksByTodoId([FromRoute] Guid id)
+        {
+            var response = await _projectTaskService.GetTasksByTodoIdAsync(id);
+            if (!response.Success)
+            {
+                _logger.LogError("GetTasksByTodoId failed: {Message}", response.Message);
+                return Ok(response);
+            }
+            return Ok(response);
+        }
     }
 }

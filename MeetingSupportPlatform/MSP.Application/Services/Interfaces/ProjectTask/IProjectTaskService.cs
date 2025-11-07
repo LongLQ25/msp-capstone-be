@@ -13,5 +13,6 @@ namespace MSP.Application.Services.Interfaces.ProjectTask
         Task<ApiResponse<PagingResponse<GetTaskResponse>>> GetTasksByProjectIdAsync(PagingRequest request, Guid projectId);
         Task<ApiResponse<PagingResponse<GetTaskResponse>>> GetTasksByUserIdAndProjectIdAsync(PagingRequest request, Guid userId, Guid projectId);
         Task<ApiResponse<List<GetTaskResponse>>> GetTasksByMilestoneIdAsync(Guid milestoneId);
+        Task<ApiResponse<List<GetTaskResponse>>> GetTasksByTodoIdAsync(Guid todoId);
     }
 }

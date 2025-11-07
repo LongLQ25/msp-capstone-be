@@ -49,5 +49,14 @@ namespace MSP.Infrastructure.Repositories
                 .Where(pt => id.Contains(pt.Id) && !pt.IsDeleted)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<ProjectTask>> GetTasksByTodoIdAsync(Guid todoId)
+        {
+            return await _context.ProjectTasks
+                .Where(pt => pt.ReferencingTodos.Any(t => t.Id == todoId) && !pt.IsDeleted)
+                .Include(pt => pt.User)
+                .Include(pt => pt.Milestones)
+                .ToListAsync();
+        }
     }
 }

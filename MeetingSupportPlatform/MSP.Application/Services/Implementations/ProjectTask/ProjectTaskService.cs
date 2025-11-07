@@ -16,14 +16,16 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         private readonly IProjectTaskRepository _projectTaskRepository;
         private readonly IProjectRepository _projectRepository;
         private readonly IMilestoneRepository _milestoneRepository;
+        private readonly ITodoRepository _todoRepository;
         private readonly UserManager<User> _userManager;
 
-        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository, UserManager<User> userManager)
+        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository, UserManager<User> userManager, ITodoRepository todoRepository)
         {
             _projectTaskRepository = projectTaskRepository;
             _projectRepository = projectRepository;
             _milestoneRepository = milestoneRepository;
             _userManager = userManager;
+            _todoRepository = todoRepository;
         }
 
         public async Task<ApiResponse<GetTaskResponse>> CreateTaskAsync(CreateTaskRequest request)
@@ -378,6 +380,47 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             {
                 return ApiResponse<List<GetTaskResponse>>.ErrorResponse(null, "No tasks found for the milestone");
             }
+            var response = tasks.Select(task => new GetTaskResponse
+            {
+                Id = task.Id,
+                ProjectId = task.ProjectId,
+                UserId = task.UserId,
+                Title = task.Title,
+                Description = task.Description,
+                Status = task.Status,
+                StartDate = task.StartDate,
+                EndDate = task.EndDate,
+                CreatedAt = task.CreatedAt,
+                UpdatedAt = task.UpdatedAt,
+                User = task.User == null ? null : new GetUserResponse
+                {
+                    Id = task.User.Id,
+                    Email = task.User.Email,
+                    FullName = task.User.FullName,
+                    AvatarUrl = task.User.AvatarUrl,
+                },
+                Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
+                {
+                    Id = m.Id,
+                    ProjectId = m.ProjectId,
+                    Name = m.Name,
+                    DueDate = m.DueDate
+                }).ToArray()
+            }).ToList();
+
+            return ApiResponse<List<GetTaskResponse>>.SuccessResponse(response, "Tasks retrieved successfully");
+        }
+
+        public async Task<ApiResponse<List<GetTaskResponse>>> GetTasksByTodoIdAsync(Guid todoId)
+        {
+            var todo = await _todoRepository.GetByIdAsync(todoId);
+            if (todo == null)
+            {
+                return ApiResponse<List<GetTaskResponse>>.ErrorResponse(null, "Todo not found");
+            }
+            var tasks = await _projectTaskRepository.GetTasksByTodoIdAsync(todoId);
+            tasks ??= new List<Domain.Entities.ProjectTask>();
+
             var response = tasks.Select(task => new GetTaskResponse
             {
                 Id = task.Id,

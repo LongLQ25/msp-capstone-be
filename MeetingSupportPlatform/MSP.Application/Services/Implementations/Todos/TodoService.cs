@@ -204,7 +204,8 @@ namespace MSP.Application.Services.Implementations.Todos
                     Email = todo.User.Email,
                     AvatarUrl = todo.User.AvatarUrl
                 } : null,
-                Status = todo.Status
+                Status = todo.Status,
+                ReferencedTasks = todo.ReferencedTasks.Select(t => t.Id).ToList()
             });
             return ApiResponse<IEnumerable<GetTodoResponse>>.SuccessResponse(rs, "Get todos successfully");
         }
