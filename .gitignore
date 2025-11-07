@@ -335,3 +335,5 @@ appsettings.Development.json
 
 # Visual Studio Solution Files
 *.sln.docstates
+# Logs
+MeetingSupportPlatform/MSP.WebAPI/*.text
