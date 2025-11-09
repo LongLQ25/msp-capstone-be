@@ -14,5 +14,15 @@ namespace MSP.Application.Repositories
         Task<IEnumerable<Meeting>> GetMeetingByProjectIdAsync(Guid projectId);
         Task<bool> CancelMeetingAsync(Guid id);
         Task<IEnumerable<User>> GetAttendeesAsync(IEnumerable<Guid> attendeeIds);
+        
+        /// <summary>
+        /// Lấy danh sách meetings có status Scheduled và đã đến StartTime
+        /// </summary>
+        Task<IEnumerable<Meeting>> GetScheduledMeetingsToStartAsync(DateTime currentTime, string scheduledStatus);
+        
+        /// <summary>
+        /// Lấy danh sách meetings có status Ongoing, không có EndTime và đã quá 1 giờ từ StartTime
+        /// </summary>
+        Task<IEnumerable<Meeting>> GetOngoingMeetingsToFinishAsync(DateTime currentTime, string ongoingStatus);
     }
 }

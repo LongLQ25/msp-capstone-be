@@ -56,5 +56,30 @@ namespace MSP.Infrastructure.Repositories
             return true;
         }
 
+        public async Task<IEnumerable<Meeting>> GetScheduledMeetingsToStartAsync(DateTime currentTime, string scheduledStatus)
+        {
+            // Query được optimize bằng cách filter trực tiếp ở database level
+            // Chỉ lấy meetings có status Scheduled và đã đến StartTime
+            return await _context.Meetings
+                .Where(m =>
+                    !m.IsDeleted &&
+                    m.Status == scheduledStatus &&
+                    m.StartTime <= currentTime)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Meeting>> GetOngoingMeetingsToFinishAsync(DateTime currentTime, string ongoingStatus)
+        {
+            // Query được optimize bằng cách filter trực tiếp ở database level
+            // Chỉ lấy meetings có status Ongoing, không có EndTime và đã quá 1 giờ từ StartTime
+            return await _context.Meetings
+                .Where(m =>
+                    !m.IsDeleted &&
+                    m.Status == ongoingStatus &&
+                    !m.EndTime.HasValue &&
+                    m.StartTime.AddHours(1) <= currentTime)
+                .ToListAsync();
+        }
+
     }
 }

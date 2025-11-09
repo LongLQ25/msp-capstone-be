@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.AspNetCore.Builder;
 using MSP.Application.Services.Implementations.ProjectTask;
+using MSP.Application.Services.Implementations.Meeting;
 
 namespace MSP.Application.Extensions
 {
@@ -16,12 +17,25 @@ namespace MSP.Application.Extensions
         /// <returns>IApplicationBuilder ?? chain ti?p</returns>
         public static IApplicationBuilder UseHangfireJobs(this IApplicationBuilder app)
         {
-            // Configure Task Status Cron Job
+            // 1. Task Status Cron Job
             // T? ??ng ki?m tra và c?p nh?t task quá h?n thành OverDue
             RecurringJob.AddOrUpdate<TaskStatusCronJobService>(
                 "update-overdue-tasks",
                 service => service.UpdateOverdueTasksAsync(),
                 "*/5 * * * *", // Ch?y m?i 5 phút
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            // 2. Meeting Status Cron Job
+            // T? ??ng c?p nh?t status c?a meetings
+            // - Scheduled ? Ongoing khi ??n StartTime
+            // - Ongoing ? Finished khi ?ã quá 1 gi? t? StartTime
+            RecurringJob.AddOrUpdate<MeetingStatusCronJobService>(
+                "update-meeting-statuses",
+                service => service.UpdateMeetingStatusesAsync(),
+                "* * * * *", // Ch?y m?i phút
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
@@ -42,16 +56,27 @@ namespace MSP.Application.Extensions
         /// C?u hình Recurring Jobs v?i custom options
         /// </summary>
         /// <param name="app">IApplicationBuilder instance</param>
-        /// <param name="cronExpression">Cron expression cho task status job</param>
+        /// <param name="taskStatusCronExpression">Cron expression cho task status job</param>
+        /// <param name="meetingStatusCronExpression">Cron expression cho meeting status job</param>
         /// <returns>IApplicationBuilder ?? chain ti?p</returns>
         public static IApplicationBuilder UseHangfireJobs(
             this IApplicationBuilder app, 
-            string taskStatusCronExpression = "*/5 * * * *")
+            string taskStatusCronExpression = "*/5 * * * *",
+            string meetingStatusCronExpression = "* * * * *")
         {
             RecurringJob.AddOrUpdate<TaskStatusCronJobService>(
                 "update-overdue-tasks",
                 service => service.UpdateOverdueTasksAsync(),
                 taskStatusCronExpression,
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            RecurringJob.AddOrUpdate<MeetingStatusCronJobService>(
+                "update-meeting-statuses",
+                service => service.UpdateMeetingStatusesAsync(),
+                meetingStatusCronExpression,
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
