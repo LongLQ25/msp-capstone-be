@@ -12,20 +12,8 @@ namespace MSP.Application.Abstracts
         Task<IEnumerable<User>> GetMembersManagedByAsync(Guid businessOwnerId);
         Task<int> CountProjectsOwnedByBO(Guid id);
         Task<int> CountManagedMembersByBO(Guid id);
-        
-        /// <summary>
-        /// Lấy users có refresh token đã expired
-        /// </summary>
         Task<IEnumerable<User>> GetUsersWithExpiredRefreshTokensAsync(DateTime currentTime);
-        
-        /// <summary>
-        /// Update user
-        /// </summary>
         Task UpdateAsync(User user);
-        
-        /// <summary>
-        /// Save changes
-        /// </summary>
         Task SaveChangesAsync();
     }
 }
