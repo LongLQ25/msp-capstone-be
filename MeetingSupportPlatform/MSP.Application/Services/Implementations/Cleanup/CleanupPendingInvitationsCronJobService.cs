@@ -1,0 +1,80 @@
+using Microsoft.Extensions.Logging;
+using MSP.Application.Repositories;
+using MSP.Shared.Enums;
+
+namespace MSP.Application.Services.Implementations.Cleanup
+{
+    /// <summary>
+    /// Service ?? t? ??ng cancel/expire pending organization invitations sau X ngày
+    /// Giúp database clean và UX t?t h?n
+    /// </summary>
+    public class CleanupPendingInvitationsCronJobService
+    {
+        private readonly IOrganizationInviteRepository _organizationInviteRepository;
+        private readonly ILogger<CleanupPendingInvitationsCronJobService> _logger;
+        private const int EXPIRY_DAYS = 7; // Invitations expire after 7 days
+
+        public CleanupPendingInvitationsCronJobService(
+            IOrganizationInviteRepository organizationInviteRepository,
+            ILogger<CleanupPendingInvitationsCronJobService> logger)
+        {
+            _organizationInviteRepository = organizationInviteRepository;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Cleanup expired pending invitations
+        /// Method này s? ???c g?i b?i Hangfire Recurring Job
+        /// </summary>
+        public async Task CleanupExpiredInvitationsAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Starting to cleanup expired pending invitations at {Time}", DateTime.UtcNow);
+
+                var now = DateTime.UtcNow;
+                var expiryDate = now.AddDays(-EXPIRY_DAYS);
+
+                // L?y pending invitations ?ã quá EXPIRY_DAYS
+                var expiredInvitations = await _organizationInviteRepository.GetExpiredPendingInvitationsAsync(expiryDate);
+
+                if (expiredInvitations.Any())
+                {
+                    _logger.LogInformation("Found {Count} expired pending invitations", expiredInvitations.Count());
+
+                    foreach (var invitation in expiredInvitations)
+                    {
+                        var typeText = invitation.Type == InvitationType.Invite ? "Invitation" : "Request";
+                        var fromText = invitation.Type == InvitationType.Invite
+                            ? $"from BusinessOwner {invitation.BusinessOwnerId}"
+                            : $"from Member {invitation.MemberId}";
+
+                        _logger.LogInformation(
+                            "{Type} {InvitationId} {FromText} created at {CreatedAt} has been expired and marked as Canceled",
+                            typeText,
+                            invitation.Id,
+                            fromText,
+                            invitation.CreatedAt);
+
+                        // Mark as Canceled (ho?c có th? t?o status Expired m?i)
+                        invitation.Status = InvitationStatus.Canceled;
+                        invitation.RespondedAt = now;
+
+                        await _organizationInviteRepository.UpdateAsync(invitation);
+                    }
+
+                    _logger.LogInformation("Successfully cleaned {Count} expired invitations", expiredInvitations.Count());
+                }
+                else
+                {
+                    _logger.LogInformation("No expired pending invitations found");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while cleaning up expired invitations");
+                throw; // Rethrow ?? Hangfire có th? retry n?u c?n
+            }
+        }
+    }
+}

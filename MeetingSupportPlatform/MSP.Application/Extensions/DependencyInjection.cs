@@ -21,6 +21,7 @@ using MSP.Application.Services.Interfaces.OrganizationInvitation;
 using MSP.Application.Services.Implementations.OrganizationInvitation;
 using MSP.Application.Services.Interfaces.TaskReassignRequest;
 using MSP.Application.Services.Implementations.TaskReassignRequest;
+using MSP.Application.Services.Implementations.Cleanup;
 
 namespace MSP.Application.Extensions
 {
@@ -44,6 +45,8 @@ namespace MSP.Application.Extensions
             // Register Hangfire Job Services
             services.AddScoped<TaskStatusCronJobService>();
             services.AddScoped<MeetingStatusCronJobService>();
+            services.AddScoped<CleanupExpiredTokensCronJobService>();
+            services.AddScoped<CleanupPendingInvitationsCronJobService>();
 
 
             // Đăng ký StreamSettings từ appsettings.json

@@ -19,5 +19,9 @@ namespace MSP.Application.Repositories
         Task UpdateAsync(OrganizationInvitation invitation);
         Task<IEnumerable<OrganizationInvitation>> GetAllPendingInvitationsByMemberIdAsync(Guid memberId);
         Task UpdateRangeAsync(IEnumerable<OrganizationInvitation> invitations);
+        /// <summary>
+        /// Lấy pending invitations đã quá expiry date
+        /// </summary>
+        Task<IEnumerable<OrganizationInvitation>> GetExpiredPendingInvitationsAsync(DateTime expiryDate);
     }
 }

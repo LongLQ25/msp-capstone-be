@@ -115,5 +115,18 @@ namespace MSP.Infrastructure.Repositories
             _context.OrganizationInvitations.UpdateRange(invitations);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<IEnumerable<OrganizationInvitation>> GetExpiredPendingInvitationsAsync(DateTime expiryDate)
+        {
+            // Query được optimize bằng cách filter trực tiếp ở database level
+            // Lấy invitations có status Pending và CreatedAt < expiryDate
+            return await _context.OrganizationInvitations
+                .Where(x =>
+                    x.Status == InvitationStatus.Pending &&
+                    x.CreatedAt < expiryDate)
+                .Include(x => x.BusinessOwner)
+                .Include(x => x.Member)
+                .ToListAsync();
+        }
     }
 }

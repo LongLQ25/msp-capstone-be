@@ -41,6 +41,7 @@ namespace AuthService.Infrastructure.Repositories
                     .Any(ur => ur.UserId == u.Id && ur.Name == UserRoleEnum.BusinessOwner.ToString()))
                 .ToListAsync();
         }
+        
         public async Task<IEnumerable<User>> GetMembersManagedByAsync(Guid businessOwnerId)
         {
             var members = await _context.Users
@@ -59,6 +60,28 @@ namespace AuthService.Infrastructure.Repositories
         {
             var count = await _context.Users.CountAsync(u => u.ManagedBy.Id == id);
             return count;
+        }
+
+        public async Task<IEnumerable<User>> GetUsersWithExpiredRefreshTokensAsync(DateTime currentTime)
+        {
+            // Query users có refresh token đã expired
+            // Filter ở database level để tối ưu performance
+            return await _context.Users
+                .Where(u =>
+                    u.RefreshToken != null &&
+                    u.RefreshTokenExpiresAtUtc.HasValue &&
+                    u.RefreshTokenExpiresAtUtc.Value < currentTime)
+                .ToListAsync();
+        }
+
+        public async Task UpdateAsync(User user)
+        {
+            _context.Users.Update(user);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

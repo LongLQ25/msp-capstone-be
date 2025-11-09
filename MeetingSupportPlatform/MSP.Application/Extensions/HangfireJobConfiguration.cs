@@ -2,6 +2,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Builder;
 using MSP.Application.Services.Implementations.ProjectTask;
 using MSP.Application.Services.Implementations.Meeting;
+using MSP.Application.Services.Implementations.Cleanup;
 
 namespace MSP.Application.Extensions
 {
@@ -36,6 +37,28 @@ namespace MSP.Application.Extensions
                 "update-meeting-statuses",
                 service => service.UpdateMeetingStatusesAsync(),
                 "* * * * *", // Ch?y m?i phút
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            // 3. Cleanup Expired Refresh Tokens
+            // T? ??ng cleanup expired refresh tokens ?? b?o m?t và gi?m database bloat
+            RecurringJob.AddOrUpdate<CleanupExpiredTokensCronJobService>(
+                "cleanup-expired-tokens",
+                service => service.CleanupExpiredTokensAsync(),
+                Cron.Daily(2), // Ch?y hàng ngày lúc 2:00 AM UTC
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            // 4. Cleanup Expired Pending Invitations
+            // T? ??ng cancel/expire pending organization invitations sau 7 ngày
+            RecurringJob.AddOrUpdate<CleanupPendingInvitationsCronJobService>(
+                "cleanup-pending-invitations",
+                service => service.CleanupExpiredInvitationsAsync(),
+                Cron.Daily(3), // Ch?y hàng ngày lúc 3:00 AM UTC
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
@@ -77,6 +100,24 @@ namespace MSP.Application.Extensions
                 "update-meeting-statuses",
                 service => service.UpdateMeetingStatusesAsync(),
                 meetingStatusCronExpression,
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            RecurringJob.AddOrUpdate<CleanupExpiredTokensCronJobService>(
+                "cleanup-expired-tokens",
+                service => service.CleanupExpiredTokensAsync(),
+                Cron.Daily(2),
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            RecurringJob.AddOrUpdate<CleanupPendingInvitationsCronJobService>(
+                "cleanup-pending-invitations",
+                service => service.CleanupExpiredInvitationsAsync(),
+                Cron.Daily(3),
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
