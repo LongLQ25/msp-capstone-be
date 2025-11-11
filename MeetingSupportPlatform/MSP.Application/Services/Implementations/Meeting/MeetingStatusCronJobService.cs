@@ -4,11 +4,6 @@ using MSP.Shared.Enums;
 
 namespace MSP.Application.Services.Implementations.Meeting
 {
-    /// <summary>
-    /// Service ?? t? ??ng c?p nh?t status c?a meetings s? d?ng Hangfire
-    /// - Scheduled ? Ongoing khi ??n StartTime
-    /// - Ongoing ? Finished khi không có EndTime và ?ã quá 1 gi? t? StartTime
-    /// </summary>
     public class MeetingStatusCronJobService
     {
         private readonly IMeetingRepository _meetingRepository;
@@ -22,10 +17,6 @@ namespace MSP.Application.Services.Implementations.Meeting
             _logger = logger;
         }
 
-        /// <summary>
-        /// C?p nh?t status c?a meetings
-        /// Method này s? ???c g?i b?i Hangfire Recurring Job
-        /// </summary>
         public async Task UpdateMeetingStatusesAsync()
         {
             try
@@ -35,7 +26,7 @@ namespace MSP.Application.Services.Implementations.Meeting
                 var now = DateTime.UtcNow;
                 int updatedCount = 0;
 
-                // 1. C?p nh?t meetings t? Scheduled ? Ongoing
+                // 1. Update meetings from Scheduled to Ongoing
                 var scheduledMeetings = await _meetingRepository.GetScheduledMeetingsToStartAsync(
                     now, 
                     MeetingEnum.Scheduled.ToString());
@@ -62,7 +53,7 @@ namespace MSP.Application.Services.Implementations.Meeting
                     await _meetingRepository.SaveChangesAsync();
                 }
 
-                // 2. C?p nh?t meetings t? Ongoing ? Finished (?ã quá 1 gi? và không có EndTime)
+                // 2. Update meetings from Ongoing to Finished (over 1 hour and no EndTime)
                 var ongoingMeetings = await _meetingRepository.GetOngoingMeetingsToFinishAsync(
                     now,
                     MeetingEnum.Ongoing.ToString());

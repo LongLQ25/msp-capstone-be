@@ -63,5 +63,30 @@ namespace MSP.Infrastructure.Repositories
                 .Select(p => p.Id)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Project>> GetScheduledProjectsToStartAsync(DateTime currentTime, string scheduledStatus)
+        {
+            return await _context.Projects
+                .Where(p =>
+                    !p.IsDeleted &&
+                    p.Status == scheduledStatus &&
+                    p.StartDate.HasValue &&
+                    p.StartDate.Value <= currentTime)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Project>> GetProjectsNearingDeadlineAsync(DateTime currentTime, DateTime deadlineThreshold, string inProgressStatus)
+        {
+            return await _context.Projects
+                .Where(p =>
+                    !p.IsDeleted &&
+                    p.Status == inProgressStatus &&
+                    p.EndDate.HasValue &&
+                    p.EndDate.Value >= currentTime &&
+                    p.EndDate.Value <= deadlineThreshold)
+                .Include(p => p.Owner)
+                .Include(p => p.CreatedBy)
+                .ToListAsync();
+        }
     }
 }

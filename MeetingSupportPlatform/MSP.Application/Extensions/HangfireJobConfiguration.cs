@@ -3,85 +3,91 @@ using Microsoft.AspNetCore.Builder;
 using MSP.Application.Services.Implementations.ProjectTask;
 using MSP.Application.Services.Implementations.Meeting;
 using MSP.Application.Services.Implementations.Cleanup;
+using MSP.Application.Services.Implementations.Project;
 
 namespace MSP.Application.Extensions
 {
     /// <summary>
-    /// Extension methods ?? c?u hình Hangfire Recurring Jobs
+    /// Extension methods to configure Hangfire Recurring Jobs
     /// </summary>
     public static class HangfireJobConfiguration
     {
         /// <summary>
-        /// C?u hình t?t c? Hangfire Recurring Jobs cho ?ng d?ng
+        /// Configure all Hangfire Recurring Jobs for the application
         /// </summary>
         /// <param name="app">IApplicationBuilder instance</param>
-        /// <returns>IApplicationBuilder ?? chain ti?p</returns>
+        /// <returns>IApplicationBuilder for method chaining</returns>
         public static IApplicationBuilder UseHangfireJobs(this IApplicationBuilder app)
         {
             // 1. Task Status Cron Job
-            // T? ??ng ki?m tra và c?p nh?t task quá h?n thành OverDue
+            // Automatically check and update overdue tasks to OverDue status
             RecurringJob.AddOrUpdate<TaskStatusCronJobService>(
                 "update-overdue-tasks",
                 service => service.UpdateOverdueTasksAsync(),
-                "*/5 * * * *", // Ch?y m?i 5 phút
+                "*/5 * * * *", // Run every 5 minutes
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
                 });
 
             // 2. Meeting Status Cron Job
-            // T? ??ng c?p nh?t status c?a meetings
-            // - Scheduled ? Ongoing khi ??n StartTime
-            // - Ongoing ? Finished khi ?ã quá 1 gi? t? StartTime
+            // Automatically update meeting statuses
+            // - Scheduled ? Ongoing when StartTime is reached
+            // - Ongoing ? Finished when 1 hour has passed from StartTime
             RecurringJob.AddOrUpdate<MeetingStatusCronJobService>(
                 "update-meeting-statuses",
                 service => service.UpdateMeetingStatusesAsync(),
-                "* * * * *", // Ch?y m?i phút
+                "* * * * *", // Run every minute
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
                 });
 
-            // 3. Cleanup Expired Refresh Tokens
-            // T? ??ng cleanup expired refresh tokens ?? b?o m?t và gi?m database bloat
+            // 3. Project Status Cron Job
+            // Automatically update project statuses
+            // - Scheduled ? InProgress when StartDate is reached
+            // - Send deadline warnings to Owner and Members (7 days before EndDate)
+            RecurringJob.AddOrUpdate<ProjectStatusCronJobService>(
+                "update-project-statuses",
+                service => service.UpdateProjectStatusesAsync(),
+                Cron.Daily(), // Run every day at 12:00 AM UTC
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            // 4. Cleanup Expired Refresh Tokens
+            // Automatically cleanup expired refresh tokens for security and reduce database bloat
             RecurringJob.AddOrUpdate<CleanupExpiredTokensCronJobService>(
                 "cleanup-expired-tokens",
                 service => service.CleanupExpiredTokensAsync(),
-                Cron.Daily(2), // Ch?y hàng ngày lúc 2:00 AM UTC
+                Cron.Daily(2), // Run daily at 2:00 AM UTC
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
                 });
 
-            // 4. Cleanup Expired Pending Invitations
-            // T? ??ng cancel/expire pending organization invitations sau 7 ngày
+            // 5. Cleanup Expired Pending Invitations
+            // Automatically cancel/expire pending organization invitations after 7 days
             RecurringJob.AddOrUpdate<CleanupPendingInvitationsCronJobService>(
                 "cleanup-pending-invitations",
                 service => service.CleanupExpiredInvitationsAsync(),
-                Cron.Daily(3), // Ch?y hàng ngày lúc 3:00 AM UTC
+                Cron.Daily(3), // Run daily at 3:00 AM UTC
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc
                 });
-
-            // TODO: Thêm các recurring jobs khác ? ?ây n?u c?n
-            // Example:
-            // RecurringJob.AddOrUpdate<AnotherService>(
-            //     "another-job",
-            //     service => service.DoSomethingAsync(),
-            //     Cron.Daily, // Ho?c custom cron expression
-            //     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
             return app;
         }
 
         /// <summary>
-        /// C?u hình Recurring Jobs v?i custom options
+        /// Configure Recurring Jobs with custom options
         /// </summary>
         /// <param name="app">IApplicationBuilder instance</param>
-        /// <param name="taskStatusCronExpression">Cron expression cho task status job</param>
-        /// <param name="meetingStatusCronExpression">Cron expression cho meeting status job</param>
-        /// <returns>IApplicationBuilder ?? chain ti?p</returns>
+        /// <param name="taskStatusCronExpression">Cron expression for task status job</param>
+        /// <param name="meetingStatusCronExpression">Cron expression for meeting status job</param>
+        /// <returns>IApplicationBuilder for method chaining</returns>
         public static IApplicationBuilder UseHangfireJobs(
             this IApplicationBuilder app, 
             string taskStatusCronExpression = "*/5 * * * *",
@@ -100,6 +106,15 @@ namespace MSP.Application.Extensions
                 "update-meeting-statuses",
                 service => service.UpdateMeetingStatusesAsync(),
                 meetingStatusCronExpression,
+                new RecurringJobOptions
+                {
+                    TimeZone = TimeZoneInfo.Utc
+                });
+
+            RecurringJob.AddOrUpdate<ProjectStatusCronJobService>(
+                "update-project-statuses",
+                service => service.UpdateProjectStatusesAsync(),
+                Cron.Daily(),
                 new RecurringJobOptions
                 {
                     TimeZone = TimeZoneInfo.Utc

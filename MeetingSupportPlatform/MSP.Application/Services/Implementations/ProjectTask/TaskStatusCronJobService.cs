@@ -8,7 +8,7 @@ using MSP.Shared.Enums;
 namespace MSP.Application.Services.Implementations.ProjectTask
 {
     /// <summary>
-    /// Service ?? t? ??ng ki?m tra và c?p nh?t status c?a task thành OverDue s? d?ng Hangfire
+    /// Service to automatically check and update task status to OverDue using Hangfire
     /// </summary>
     public class TaskStatusCronJobService
     {
@@ -24,8 +24,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         }
 
         /// <summary>
-        /// Ki?m tra và c?p nh?t các task quá h?n thành OverDue
-        /// Method này s? ???c g?i b?i Hangfire Recurring Job
+        /// Check and update overdue tasks to OverDue status
+        /// This method will be called by Hangfire Recurring Job
         /// </summary>
         public async Task UpdateOverdueTasksAsync()
         {
@@ -35,7 +35,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 
                 var now = DateTime.UtcNow;
                 
-                // Query tr?c ti?p t? database các tasks quá h?n
+                // Query overdue tasks directly from database
                 var tasksToUpdate = await _projectTaskRepository.GetOverdueTasksAsync(
                     now,
                     TaskEnum.OverDue.ToString(),
@@ -72,7 +72,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while updating overdue tasks");
-                throw; // Rethrow ?? Hangfire có th? retry n?u c?n
+                throw; // Rethrow for Hangfire to retry if needed
             }
         }
     }

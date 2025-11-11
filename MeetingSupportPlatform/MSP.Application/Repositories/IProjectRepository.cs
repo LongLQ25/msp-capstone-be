@@ -10,5 +10,7 @@ namespace MSP.Application.Repositories
         Task<IEnumerable<Project>> GetProjectsByBOIdAsync(Guid boId);
         Task<Project?> GetProjectByIdAsync(Guid id);
         Task<List<Guid>> GetProjectIdsByOwnerIdAsync(Guid ownerId);
+        Task<IEnumerable<Project>> GetScheduledProjectsToStartAsync(DateTime currentTime, string scheduledStatus);
+        Task<IEnumerable<Project>> GetProjectsNearingDeadlineAsync(DateTime currentTime, DateTime deadlineThreshold, string inProgressStatus);
     }
 }

@@ -68,7 +68,8 @@ builder.Services.AddCors(options =>
             policy.WithOrigins(
                 "http://localhost:3000",
                 "https://localhost:3000",
-                "https://msp-capstone-fe.vercel.app"
+                "https://msp-capstone-fe.vercel.app",
+                "https://msp.audivia.vn"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()

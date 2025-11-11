@@ -5,8 +5,8 @@ using MSP.Shared.Enums;
 namespace MSP.Application.Services.Implementations.Cleanup
 {
     /// <summary>
-    /// Service ?? t? ??ng cancel/expire pending organization invitations sau X ngày
-    /// Giúp database clean và UX t?t h?n
+    /// Service to automatically cancel/expire pending organization invitations after X days
+    /// Helps keep database clean and improves user experience
     /// </summary>
     public class CleanupPendingInvitationsCronJobService
     {
@@ -24,7 +24,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
 
         /// <summary>
         /// Cleanup expired pending invitations
-        /// Method này s? ???c g?i b?i Hangfire Recurring Job
+        /// This method will be called by Hangfire Recurring Job
         /// </summary>
         public async Task CleanupExpiredInvitationsAsync()
         {
@@ -35,7 +35,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
                 var now = DateTime.UtcNow;
                 var expiryDate = now.AddDays(-EXPIRY_DAYS);
 
-                // L?y pending invitations ?ã quá EXPIRY_DAYS
+                // Get pending invitations that have exceeded EXPIRY_DAYS
                 var expiredInvitations = await _organizationInviteRepository.GetExpiredPendingInvitationsAsync(expiryDate);
 
                 if (expiredInvitations.Any())
@@ -56,7 +56,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
                             fromText,
                             invitation.CreatedAt);
 
-                        // Mark as Canceled (ho?c có th? t?o status Expired m?i)
+                        // Mark as Canceled (or could create a new Expired status)
                         invitation.Status = InvitationStatus.Canceled;
                         invitation.RespondedAt = now;
 
@@ -73,7 +73,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while cleaning up expired invitations");
-                throw; // Rethrow ?? Hangfire có th? retry n?u c?n
+                throw; // Rethrow for Hangfire to retry if needed
             }
         }
     }

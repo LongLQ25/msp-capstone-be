@@ -4,8 +4,8 @@ using MSP.Application.Abstracts;
 namespace MSP.Application.Services.Implementations.Cleanup
 {
     /// <summary>
-    /// Service ?? t? ??ng cleanup expired refresh tokens s? d?ng Hangfire
-    /// Giúp b?o m?t và gi?m database bloat
+    /// Service to automatically cleanup expired refresh tokens using Hangfire
+    /// Helps with security and reduces database bloat
     /// </summary>
     public class CleanupExpiredTokensCronJobService
     {
@@ -22,7 +22,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
 
         /// <summary>
         /// Cleanup expired refresh tokens
-        /// Method này s? ???c g?i b?i Hangfire Recurring Job
+        /// This method will be called by Hangfire Recurring Job
         /// </summary>
         public async Task CleanupExpiredTokensAsync()
         {
@@ -32,7 +32,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
 
                 var now = DateTime.UtcNow;
 
-                // L?y users có expired refresh tokens
+                // Get users with expired refresh tokens
                 var usersWithExpiredTokens = await _userRepository.GetUsersWithExpiredRefreshTokensAsync(now);
 
                 if (usersWithExpiredTokens.Any())
@@ -65,7 +65,7 @@ namespace MSP.Application.Services.Implementations.Cleanup
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while cleaning up expired refresh tokens");
-                throw; // Rethrow ?? Hangfire có th? retry n?u c?n
+                throw; // Rethrow for Hangfire to retry if needed
             }
         }
     }

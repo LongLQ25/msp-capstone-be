@@ -29,7 +29,7 @@ namespace MSP.Application.Extensions
     {
         public static IServiceCollection AddApplicationService(this IServiceCollection services, IConfiguration configuration)
         {
-            // Create DI
+            // Register Business Services
             services.AddScoped<IAccountService, AccountService>();
             services.AddScoped<INotificationService, MSP.Application.Services.Implementations.Notification.NotificationService>();
             services.AddScoped<ISummarizeTextService, SummarizeTextService>();
@@ -42,21 +42,21 @@ namespace MSP.Application.Extensions
             services.AddScoped<ITodoService, TodoService>();
             services.AddScoped<ITaskReassignRequestService, TaskReassignRequestService>();
             
-            // Register Hangfire Job Services
+            // Register Hangfire Cron Job Services
             services.AddScoped<TaskStatusCronJobService>();
             services.AddScoped<MeetingStatusCronJobService>();
+            services.AddScoped<ProjectStatusCronJobService>();
             services.AddScoped<CleanupExpiredTokensCronJobService>();
             services.AddScoped<CleanupPendingInvitationsCronJobService>();
 
-
-            // Đăng ký StreamSettings từ appsettings.json
+            // Register StreamSettings from appsettings.json
             services.Configure<StreamSettings>(
                 configuration.GetSection("Stream"));
 
-            // Đăng ký HttpClientFactory
+            // Register HttpClientFactory
             services.AddHttpClient();
 
-            // Đăng ký StreamService với DI
+            // Register StreamService with DI
             services.AddScoped<IStreamService, StreamService>();
 
             return services;
