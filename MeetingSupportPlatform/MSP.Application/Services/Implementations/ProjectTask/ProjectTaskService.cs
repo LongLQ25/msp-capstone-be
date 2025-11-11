@@ -1,11 +1,14 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MSP.Application.Models.Requests.ProjectTask;
+using MSP.Application.Models.Requests.TaskReassignRequest;
 using MSP.Application.Models.Responses.Auth;
 using MSP.Application.Models.Responses.Milestone;
 using MSP.Application.Models.Responses.ProjectTask;
+using MSP.Application.Models.Responses.TaskHistory;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.ProjectTask;
+using MSP.Application.Services.Interfaces.TaskHistory;
 using MSP.Domain.Entities;
 using MSP.Shared.Common;
 
@@ -17,15 +20,18 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         private readonly IProjectRepository _projectRepository;
         private readonly IMilestoneRepository _milestoneRepository;
         private readonly ITodoRepository _todoRepository;
+        private readonly ITaskHistoryService _taskHistoryService;
         private readonly UserManager<User> _userManager;
 
-        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository, UserManager<User> userManager, ITodoRepository todoRepository)
+        public ProjectTaskService(IProjectTaskRepository projectTaskRepository, IProjectRepository projectRepository, IMilestoneRepository milestoneRepository, UserManager<User> userManager, ITodoRepository todoRepository, ITaskHistoryService taskHistoryService)
         {
             _projectTaskRepository = projectTaskRepository;
             _projectRepository = projectRepository;
             _milestoneRepository = milestoneRepository;
             _userManager = userManager;
             _todoRepository = todoRepository;
+            _taskHistoryService = taskHistoryService;
+
         }
 
         public async Task<ApiResponse<GetTaskResponse>> CreateTaskAsync(CreateTaskRequest request)
@@ -76,6 +82,20 @@ namespace MSP.Application.Services.Implementations.ProjectTask
 
             await _projectTaskRepository.AddAsync(newTask);
             await _projectTaskRepository.SaveChangesAsync();
+
+            // Tạo TaskHistory nếu có UserId
+            if (request.UserId != null)
+            {
+                var newTaskHistory = new CreateTaskHistoryRequest
+                {
+                    TaskId = newTask.Id,
+                    FromUserId = null,
+                    ToUserId = request.UserId.Value
+                };
+                await _taskHistoryService.CreateTaskHistoryAsync(newTaskHistory);
+            }
+
+
 
             var response = new GetTaskResponse
             {
@@ -153,7 +173,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     ProjectId = m.ProjectId,
                     Name = m.Name,
                     DueDate = m.DueDate
-                }).ToArray()
+                }).ToArray(),
             };
             return ApiResponse<GetTaskResponse>.SuccessResponse(response, "Task retrieved successfully");
         }
@@ -285,11 +305,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         public async Task<ApiResponse<GetTaskResponse>> UpdateTaskAsync(UpdateTaskRequest request)
         {
             var task = await _projectTaskRepository.GetTaskByIdAsync(request.Id);
+
             if (task == null || task.IsDeleted)
             {
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Task not found");
             }
-
+            var oldUserId = task.UserId;
             var project = await _projectRepository.GetByIdAsync(task.ProjectId);
             if (project == null || project.IsDeleted)
             {
@@ -336,6 +357,26 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             await _projectTaskRepository.UpdateAsync(task);
             await _projectTaskRepository.SaveChangesAsync();
 
+            if (request.UserId != null)
+            {
+                if (oldUserId == request.UserId)
+                {
+                    // Nếu user không thay đổi, không tạo lịch sử
+                    return ApiResponse<GetTaskResponse>.SuccessResponse(null, "Task updated successfully");
+                }
+                if (oldUserId != request.UserId)
+                {
+                    var newTaskHistory = new CreateTaskHistoryRequest
+                    {
+                        TaskId = request.Id,
+                        FromUserId = oldUserId,
+                        ToUserId = request.UserId.Value
+                    };
+                    await _taskHistoryService.CreateTaskHistoryAsync(newTaskHistory);
+                }
+
+
+            }
             var response = new GetTaskResponse
             {
                 Id = task.Id,
