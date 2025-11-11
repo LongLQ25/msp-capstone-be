@@ -19,8 +19,8 @@ using MSP.Application.Services.Interfaces.Todos;
 using MSP.Application.Services.Implementations.Todos;
 using MSP.Application.Services.Interfaces.OrganizationInvitation;
 using MSP.Application.Services.Implementations.OrganizationInvitation;
-using MSP.Application.Services.Interfaces.TaskReassignRequest;
-using MSP.Application.Services.Implementations.TaskReassignRequest;
+using MSP.Application.Services.Interfaces.TaskHistory;
+using MSP.Application.Services.Implementations.TaskHistory;
 
 namespace MSP.Application.Extensions
 {
@@ -39,7 +39,7 @@ namespace MSP.Application.Extensions
             services.AddScoped<IOrganizationInvitationService, OrganizationInvitationService>();
             services.AddScoped<IMeetingService, MeetingService>();
             services.AddScoped<ITodoService, TodoService>();
-            services.AddScoped<ITaskReassignRequestService, TaskReassignRequestService>();
+            services.AddScoped<ITaskHistoryService, TaskHistoryService>();
             
             // Register Background Services (Cron Jobs) - chỉ giữ MeetingCronJobService
             services.AddHostedService<MeetingCronJobService>();
