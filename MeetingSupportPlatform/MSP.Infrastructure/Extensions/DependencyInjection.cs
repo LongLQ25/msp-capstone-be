@@ -15,6 +15,7 @@ namespace MSP.Infrastructure.Extensions
             services.AddCustomDBContext(config);
             services.AddServices(config);
             services.AddGeminiService(config);
+
             return services;
         }
 

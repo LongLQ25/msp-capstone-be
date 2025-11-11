@@ -4,16 +4,17 @@ using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using MSP.Application.Extensions;
 using MSP.Infrastructure.Extensions;
+using MSP.WebAPI.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Services Registration
 builder.Services.AddControllers();
 builder.Services.AddInfrastuctureService(builder.Configuration);
 builder.Services.AddApplicationService(builder.Configuration);
 builder.Services.AddAuthorization();
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -23,7 +24,7 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1"
     });
 
-    // Thêm JWT Bearer Authentication
+    // Add JWT Bearer Authentication
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
@@ -48,6 +49,8 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
+
+// HTTP Client
 builder.Services.AddHttpClient();
 
 // Add Hangfire
@@ -59,7 +62,16 @@ builder.Services.AddHangfire(config =>
 
 builder.Services.AddHangfireServer();
 
-// Add CORS
+// SignalR
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSignalRNotificationService<NotificationHub>();
+
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowWeb",
@@ -73,10 +85,11 @@ builder.Services.AddCors(options =>
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials();
+            .AllowCredentials(); // Important for SignalR
         });
 });
 
+// Build & Configure Pipeline
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -88,7 +101,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Thêm routing
+// Add routing
 app.UseRouting();
 
 app.UseInfrastructurePolicy();
@@ -105,6 +118,9 @@ app.UseHangfireDashboard();
 
 // Configure Hangfire Recurring Jobs
 app.UseHangfireJobs();
+
+// Map SignalR Hub
+app.MapHub<NotificationHub>("/notificationHub");
 
 app.MapControllers();
 app.Run();

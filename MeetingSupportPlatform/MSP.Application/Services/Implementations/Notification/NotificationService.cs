@@ -11,16 +11,19 @@ namespace MSP.Application.Services.Implementations.Notification
     {
         private readonly INotificationRepository _notificationRepository;
         private readonly IEmailSender _emailSender;
+        private readonly ISignalRNotificationService _signalRService;
 
         public NotificationService(
             INotificationRepository notificationRepository,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            ISignalRNotificationService signalRService)
         {
             _notificationRepository = notificationRepository;
             _emailSender = emailSender;
+            _signalRService = signalRService;
         }
 
-        /// G?i email notification qua Hangfire
+        /// Send email notification via Hangfire
         public void SendEmailNotification(string toEmail, string title, string message)
         {
             BackgroundJob.Enqueue(() =>
@@ -28,7 +31,7 @@ namespace MSP.Application.Services.Implementations.Notification
             );
         }
 
-        /// T?o notification InApp (tách riêng)
+        /// Create InApp notification and push via SignalR
         public async Task<NotificationResponse> CreateInAppNotificationAsync(CreateNotificationRequest request)
         {
             var notification = new Domain.Entities.Notification
@@ -42,10 +45,19 @@ namespace MSP.Application.Services.Implementations.Notification
             };
 
             var createdNotification = await _notificationRepository.CreateAsync(notification);
-            return MapToResponse(createdNotification);
+            var response = MapToResponse(createdNotification);
+
+            // Push notification via SignalR in real-time
+            await _signalRService.SendNotificationToUserAsync(request.UserId, response);
+
+            // Update unread count
+            var unreadCount = await _notificationRepository.GetUnreadCountAsync(request.UserId);
+            await _signalRService.UpdateUnreadCountAsync(request.UserId, unreadCount);
+
+            return response;
         }
 
-        // Các hàm CRUD notification gi? nguyên, code rõ ràng:
+        // CRUD notification methods remain the same
         public async Task<NotificationResponse?> GetNotificationByIdAsync(Guid id)
         {
             var notification = await _notificationRepository.GetByIdAsync(id);
@@ -73,8 +85,13 @@ namespace MSP.Application.Services.Implementations.Notification
             notification.IsRead = true;
 
             var updatedNotification = await _notificationRepository.UpdateAsync(notification);
+            var response = MapToResponse(updatedNotification);
 
-            return MapToResponse(updatedNotification);
+            // Update unread count via SignalR
+            var unreadCount = await _notificationRepository.GetUnreadCountAsync(notification.UserId);
+            await _signalRService.UpdateUnreadCountAsync(notification.UserId, unreadCount);
+
+            return response;
         }
 
         public async Task<bool> DeleteNotificationAsync(Guid id)

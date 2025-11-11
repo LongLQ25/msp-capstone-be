@@ -1,13 +1,16 @@
-﻿using MSP.Infrastructure.Processors;
-using MSP.Application.Abstracts;
-using AuthService.Infrastructure.Repositories;
+﻿using AuthService.Infrastructure.Repositories;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NotificationService.Infrastructure.Repositories;
-using NotificationService.Infrastructure.Implementations;
-using MSP.Infrastructure.Options;
-using MSP.Infrastructure.Repositories;
+using MSP.Application.Abstracts;
 using MSP.Application.Repositories;
+using MSP.Application.Services.Interfaces.Notification;
+using MSP.Infrastructure.Options;
+using MSP.Infrastructure.Processors;
+using MSP.Infrastructure.Repositories;
+using MSP.Infrastructure.Services;
+using NotificationService.Infrastructure.Implementations;
+using NotificationService.Infrastructure.Repositories;
 
 namespace MSP.Infrastructure.Extensions
 {
@@ -31,8 +34,27 @@ namespace MSP.Infrastructure.Extensions
             services.AddScoped<IMeetingRepository, MeetingRepository>();
             services.AddScoped<ITodoRepository, TodoRepository>();
             services.AddScoped<ITaskReassignRequestRepository, TaskReassignRequestRepository>();
+
             // Register Services
             services.AddScoped<IEmailSender, EmailSender>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// Register SignalR Notification Service with Hub type
+        /// This must be called AFTER SignalR is added (AddSignalR)
+        /// Usage: services.AddSignalRNotificationService<NotificationHub>();
+        /// </summary>
+        public static IServiceCollection AddSignalRNotificationService<THub>(this IServiceCollection services)
+            where THub : Hub
+        {
+            services.AddScoped<ISignalRNotificationService>(provider =>
+            {
+                var hubContext = provider.GetRequiredService<IHubContext<THub>>();
+                var logger = provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SignalRNotificationService>>();
+                return new SignalRNotificationService(hubContext, logger);
+            });
 
             return services;
         }
