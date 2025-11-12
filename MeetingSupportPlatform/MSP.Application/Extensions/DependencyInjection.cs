@@ -22,6 +22,8 @@ using MSP.Application.Services.Implementations.OrganizationInvitation;
 using MSP.Application.Services.Interfaces.TaskReassignRequest;
 using MSP.Application.Services.Implementations.TaskReassignRequest;
 using MSP.Application.Services.Implementations.Cleanup;
+using MSP.Application.Services.Interfaces.Document;
+using MSP.Application.Services.Implementations.Document;
 
 namespace MSP.Application.Extensions
 {
@@ -41,6 +43,7 @@ namespace MSP.Application.Extensions
             services.AddScoped<IMeetingService, MeetingService>();
             services.AddScoped<ITodoService, TodoService>();
             services.AddScoped<ITaskReassignRequestService, TaskReassignRequestService>();
+            services.AddScoped<IDocumentService, DocumentService>();
             
             // Register Hangfire Cron Job Services
             services.AddScoped<TaskStatusCronJobService>();
