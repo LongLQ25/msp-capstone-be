@@ -13,16 +13,12 @@ namespace MSP.WebAPI.Controllers
     public class PaymentWebhookController : ControllerBase
     {
         private readonly IPaymentService _paymentService;
-        private readonly PayOSClient _payOSClient;
         private readonly ILogger<PaymentWebhookController> _logger;
 
         public PaymentWebhookController(
-            IPaymentService paymentService,
-            PayOSClient payOSClient,
-            ILogger<PaymentWebhookController> logger)
+            IPaymentService paymentService, ILogger<PaymentWebhookController> logger)
         {
             _paymentService = paymentService;
-            _payOSClient = payOSClient;
             _logger = logger;
         }
 
