@@ -117,7 +117,7 @@ namespace MSP.Application.Services.Implementations.Limitation
         {
             try
             {
-                var limitations = await _limitationRepository.GetAllAsync();
+                var limitations = await _limitationRepository.GetAll();
                 var response = limitations.Select(l => new GetLimitationResponse
                 {
                     Id = l.Id,
