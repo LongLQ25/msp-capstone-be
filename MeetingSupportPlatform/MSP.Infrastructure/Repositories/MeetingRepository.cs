@@ -64,7 +64,7 @@ namespace MSP.Infrastructure.Repositories
                 .Include(m => m.CreatedBy)
                 .Include(m => m.Project)
                 .Include(m => m.Milestone)
-                .OrderBy(m => m.StartTime)
+                .OrderByDescending(m => m.StartTime)
                 .ToListAsync();
             return meetings;
         }
