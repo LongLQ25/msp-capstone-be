@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -68,8 +68,8 @@ namespace MSP.Application.Services.Implementations.Project
                             var notificationRequest = new CreateNotificationRequest
                             {
                                 UserId = project.OwnerId,
-                                Title = "? Nh?c nh? ho�n th�nh d? �n",
-                                Message = $"D? �n '{project.Name}' ?� qu� h?n {daysOverdue} ng�y (H?n ch�t: {project.EndDate:dd/MM/yyyy}). Vui l�ng xem x�t v� ?�nh d?u ho�n th�nh n?u d? �n ?� xong.",
+                                Title = "Nhắc nhở hoàn thành dự án",
+                                Message = $"Dự án '{project.Name}' đã quá hạn {daysOverdue} ngày (Hạn chót: {project.EndDate:dd/MM/yyyy}). Vui lòng xem xét và đánh dấu hoàn thành nếu dự án đã xong.",
                                 Type = NotificationTypeEnum.ProjectUpdate.ToString(),
                                 EntityId = project.Id.ToString(),
                                 Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -90,15 +90,15 @@ namespace MSP.Application.Services.Implementations.Project
                             {
                                 _notificationService.SendEmailNotification(
                                     owner.Email!,
-                                    "Nh?c nh? ho�n th�nh d? �n",
-                                    $"Xin ch�o {owner.FullName},<br/><br/>" +
-                                    $"D? �n <strong>{project.Name}</strong> ?� v??t qu� ng�y k?t th�c d? ki?n {daysOverdue} ng�y.<br/><br/>" +
-                                    $"<strong>Ng�y k?t th�c d? ki?n:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
-                                    $"<strong>Ng�y hi?n t?i:</strong> {now:dd/MM/yyyy}<br/>" +
-                                    $"<strong>S? ng�y qu� h?n:</strong> {daysOverdue} ng�y<br/>" +
-                                    $"<strong>Tr?ng th�i hi?n t?i:</strong> ?ang th?c hi?n<br/><br/>" +
-                                    $"N?u d? �n ?� ho�n th�nh, vui l�ng c?p nh?t tr?ng th�i th�nh 'Ho�n th�nh' trong h? th?ng.<br/>" +
-                                    $"N?u d? �n c?n th�m th?i gian, vui l�ng xem x�t ?i?u ch?nh ng�y k?t th�c.");
+                                    "Nhắc nhở hoàn thành dự án",
+                                    $"Xin chào {owner.FullName},<br/><br/>" +
+                                    $"Dự án <strong>{project.Name}</strong> đã vượt quá ngày kết thúc dự kiến {daysOverdue} ngày.<br/><br/>" +
+                                    $"<strong>Ngày kết thúc dự kiến:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
+                                    $"<strong>Ngày hiện tại:</strong> {now:dd/MM/yyyy}<br/>" +
+                                    $"<strong>Số ngày quá hạn:</strong> {daysOverdue} ngày<br/>" +
+                                    $"<strong>Trạng thái hiện tại:</strong> Đang thực hiện<br/><br/>" +
+                                    $"Nếu dự án đã hoàn thành, vui lòng cập nhật trạng thái thành 'Hoàn thành' trong hệ thống.<br/>" +
+                                    $"Nếu dự án cần thêm thời gian, vui lòng xem xét điều chỉnh ngày kết thúc.");
                             }
 
                             notificationsSent++;

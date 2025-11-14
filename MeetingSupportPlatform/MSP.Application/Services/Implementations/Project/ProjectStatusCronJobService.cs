@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Notification;
@@ -82,8 +82,8 @@ namespace MSP.Application.Services.Implementations.Project
                     {
                         var daysRemaining = (project.EndDate!.Value - now).Days;
                         var deadlineText = daysRemaining == 0 
-                            ? "h�m nay" 
-                            : $"trong {daysRemaining} ng�y n?a";
+                            ? "hôm nay" 
+                            : $"trong {daysRemaining} ngày n?a";
 
                         _logger.LogWarning(
                             "Project {ProjectId} ('{Name}') is nearing deadline. EndDate: {EndDate} ({DeadlineText})",
@@ -98,8 +98,8 @@ namespace MSP.Application.Services.Implementations.Project
                             await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
                             {
                                 UserId = project.OwnerId,
-                                Title = "?? C?nh b�o h?n ch�t d? �n",
-                                Message = $"D? �n '{project.Name}' s?p ??n h?n {deadlineText} (Ng�y k?t th�c: {project.EndDate:dd/MM/yyyy}). Vui l�ng xem x�t ti?n ?? d? �n.",
+                                Title = "⚠️ Cảnh báo hạn chót dự án",
+                                Message = $"Dự án '{project.Name}' sắp đến hạn {deadlineText} (Ngày kết thúc: {project.EndDate:dd/MM/yyyy}). Vui lòng xem xét tiến độ dự án.",
                                 Type = NotificationTypeEnum.InApp.ToString(),
                                 Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
                             });
@@ -138,8 +138,8 @@ namespace MSP.Application.Services.Implementations.Project
                                     await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
                                     {
                                         UserId = projectMember.MemberId,
-                                        Title = "?? C?nh b�o h?n ch�t d? �n",
-                                        Message = $"D? �n '{project.Name}' s?p ??n h?n {deadlineText} (Ng�y k?t th�c: {project.EndDate:dd/MM/yyyy}). Vui l�ng ho�n th�nh c�ng vi?c ?�ng h?n.",
+                                        Title = "⚠️ Cảnh báo hạn chót dự án",
+                                        Message = $"Dự án '{project.Name}' sắp đến hạn {deadlineText} (Ngày kết thúc: {project.EndDate:dd/MM/yyyy}). Vui lòng hoàn thành công việc đúng hạn.",
                                         Type = NotificationTypeEnum.InApp.ToString(),
                                         Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
                                     });
