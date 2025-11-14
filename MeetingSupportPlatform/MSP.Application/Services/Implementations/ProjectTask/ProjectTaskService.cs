@@ -89,8 +89,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     UserId = request.UserId.Value,
                     ActorId = request.ActorId,
-                    Title = "New Task Assigned",
-                    Message = $"You have been assigned to task: {newTask.Title} in project {project.Name}",
+                    Title = "Công việc mới được giao",
+                    Message = $"Bạn đã được giao công việc: {newTask.Title} trong dự án {project.Name}",
                     Type = NotificationTypeEnum.TaskAssignment.ToString(),
                     EntityId = newTask.Id.ToString(),
                     Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -108,8 +108,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 // Gửi email notification (async via Hangfire)
                 _notificationService.SendEmailNotification(
                     user.Email!,
-                    "New Task Assigned",
-                    $"Hi {user.FullName},<br/><br/>You have been assigned to a new task: <strong>{newTask.Title}</strong><br/>Project: {project.Name}<br/>Due Date: {newTask.EndDate:yyyy-MM-dd}<br/><br/>Please check your dashboard for more details."
+                    "Công việc mới được giao",
+                    $"Xin chào {user.FullName},<br/><br/>" +
+                    $"Bạn đã được giao công việc mới: <strong>{newTask.Title}</strong><br/>" +
+                    $"Dự án: {project.Name}<br/>" +
+                    $"Hạn chót: {newTask.EndDate:dd/MM/yyyy}<br/><br/>" +
+                    $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết."
                 );
             }
 
@@ -378,6 +382,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             // Gửi notification nếu task được assign/reassign cho user khác
             if (request.UserId.HasValue && request.UserId != oldUserId && user != null)
             {
+                string notificationTitle;
                 string notificationMessage;
                 string emailSubject;
                 string emailBody;
@@ -385,23 +390,33 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 if (oldUserId.HasValue)
                 {
                     // Task được reassign từ user khác
-                    notificationMessage = $"Task '{task.Title}' has been reassigned to you in project {project.Name}";
-                    emailSubject = "Task Reassigned";
-                    emailBody = $"Hi {user.FullName},<br/><br/>The task <strong>{task.Title}</strong> has been reassigned to you.<br/>Project: {project.Name}<br/>Due Date: {task.EndDate:yyyy-MM-dd}<br/><br/>Please check your dashboard for more details.";
+                    notificationTitle = "Công việc được giao lại";
+                    notificationMessage = $"Công việc '{task.Title}' đã được giao lại cho bạn trong dự án {project.Name}";
+                    emailSubject = "Công việc được giao lại";
+                    emailBody = $"Xin chào {user.FullName},<br/><br/>" +
+                               $"Công việc <strong>{task.Title}</strong> đã được giao lại cho bạn.<br/>" +
+                               $"Dự án: {project.Name}<br/>" +
+                               $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                               $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết.";
                 }
                 else
                 {
                     // Task được assign lần đầu
-                    notificationMessage = $"You have been assigned to task: {task.Title} in project {project.Name}";
-                    emailSubject = "New Task Assigned";
-                    emailBody = $"Hi {user.FullName},<br/><br/>You have been assigned to task: <strong>{task.Title}</strong><br/>Project: {project.Name}<br/>Due Date: {task.EndDate:yyyy-MM-dd}<br/><br/>Please check your dashboard for more details.";
+                    notificationTitle = "Công việc mới được giao";
+                    notificationMessage = $"Bạn đã được giao công việc: {task.Title} trong dự án {project.Name}";
+                    emailSubject = "Công việc mới được giao";
+                    emailBody = $"Xin chào {user.FullName},<br/><br/>" +
+                               $"Bạn đã được giao công việc mới: <strong>{task.Title}</strong><br/>" +
+                               $"Dự án: {project.Name}<br/>" +
+                               $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                               $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết.";
                 }
 
                 var notificationRequest = new CreateNotificationRequest
                 {
                     UserId = request.UserId.Value,
                     ActorId = request.ActorId,
-                    Title = emailSubject,
+                    Title = notificationTitle,
                     Message = notificationMessage,
                     Type = NotificationTypeEnum.TaskAssignment.ToString(),
                     EntityId = task.Id.ToString(),
@@ -418,12 +433,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
 
                 await _notificationService.CreateInAppNotificationAsync(notificationRequest);
 
-                //// Gửi email notification (async via Hangfire)
-                //_notificationService.SendEmailNotification(
-                //    user.Email!,
-                //    emailSubject,
-                //    emailBody
-                //);
+                // Gửi email notification (async via Hangfire)
+                _notificationService.SendEmailNotification(
+                    user.Email!,
+                    emailSubject,
+                    emailBody
+                );
             }
 
             var response = new GetTaskResponse

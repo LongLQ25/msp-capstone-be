@@ -1,12 +1,15 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Models.Requests.Project;
 using MSP.Application.Models.Responses.Auth;
 using MSP.Application.Models.Responses.Project;
 using MSP.Application.Repositories;
+using MSP.Application.Services.Interfaces.Notification;
 using MSP.Application.Services.Interfaces.Project;
 using MSP.Domain.Entities;
 using MSP.Shared.Common;
+using MSP.Shared.Enums;
 
 namespace MSP.Application.Services.Implementations.Project
 {
@@ -14,12 +17,18 @@ namespace MSP.Application.Services.Implementations.Project
     {
         private readonly IProjectRepository _projectRepository;
         private readonly IProjectMemberRepository _projectMemberRepository;
+        private readonly INotificationService _notificationService;
         private readonly UserManager<User> _userManager;
 
-        public ProjectService(IProjectRepository projectRepository, IProjectMemberRepository projectMemberRepository, UserManager<User> userManager)
+        public ProjectService(
+            IProjectRepository projectRepository,
+            IProjectMemberRepository projectMemberRepository,
+            INotificationService notificationService,
+            UserManager<User> userManager)
         {
             _projectRepository = projectRepository;
             _projectMemberRepository = projectMemberRepository;
+            _notificationService = notificationService;
             _userManager = userManager;
         }
 
@@ -476,12 +485,14 @@ namespace MSP.Application.Services.Implementations.Project
 
         public async Task<ApiResponse<GetProjectResponse>> UpdateProjectAsync(UpdateProjectRequest request)
         {
-            var project = await _projectRepository.GetByIdAsync(request.Id);
+            var project = await _projectRepository.GetProjectByIdAsync(request.Id);
             if (project == null)
             {
                 return ApiResponse<GetProjectResponse>.ErrorResponse(null, "Project not found");
             }
 
+            var oldStatus = project.Status;
+            
             project.Name = request.Name;
             project.Description = request.Description;
             project.StartDate = request.StartDate;
@@ -490,6 +501,102 @@ namespace MSP.Application.Services.Implementations.Project
             project.UpdatedAt = DateTime.UtcNow;
 
             await _projectRepository.UpdateAsync(project);
+
+            // Check if project status changed to Completed
+            if (oldStatus != ProjectStatusEnum.Completed.ToString() && 
+                request.Status == ProjectStatusEnum.Completed.ToString())
+            {
+                try
+                {
+                    // Send notification to Project Owner
+                    var owner = project.Owner;
+                    if (owner != null)
+                    {
+                        var ownerNotification = new CreateNotificationRequest
+                        {
+                            UserId = owner.Id,
+                            Title = "🎉 Dự án hoàn thành",
+                            Message = $"Dự án '{project.Name}' đã được đánh dấu là hoàn thành. Làm tốt lắm!",
+                            Type = NotificationTypeEnum.ProjectUpdate.ToString(),
+                            EntityId = project.Id.ToString(),
+                            Data = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                ProjectId = project.Id,
+                                ProjectName = project.Name,
+                                CompletedAt = DateTime.UtcNow,
+                                EventType = "ProjectCompleted"
+                            })
+                        };
+
+                        await _notificationService.CreateInAppNotificationAsync(ownerNotification);
+
+                        // Send email to owner
+                        _notificationService.SendEmailNotification(
+                            owner.Email!,
+                            "Dự án hoàn thành",
+                            $"Xin chào {owner.FullName},<br/><br/>" +
+                            $"Chúc mừng! Dự án <strong>{project.Name}</strong> đã được hoàn thành thành công.<br/><br/>" +
+                            $"<strong>Ngày bắt đầu:</strong> {project.StartDate:dd/MM/yyyy}<br/>" +
+                            $"<strong>Ngày kết thúc:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
+                            $"<strong>Hoàn thành vào:</strong> {DateTime.UtcNow:dd/MM/yyyy}<br/><br/>" +
+                            $"Cảm ơn bạn đã lãnh đạo và giám sát dự án này.");
+                    }
+
+                    // Send notifications to all active Project Members
+                    if (project.ProjectMembers?.Any() == true)
+                    {
+                        var activeMembers = project.ProjectMembers
+                            .Where(pm => !pm.LeftAt.HasValue) // Only active members
+                            .ToList();
+
+                        foreach (var projectMember in activeMembers)
+                        {
+                            try
+                            {
+                                var memberNotification = new CreateNotificationRequest
+                                {
+                                    UserId = projectMember.MemberId,
+                                    Title = "🎉 Dự án hoàn thành",
+                                    Message = $"Dự án '{project.Name}' đã hoàn thành. Cảm ơn sự đóng góp của bạn!",
+                                    Type = NotificationTypeEnum.ProjectUpdate.ToString(),
+                                    EntityId = project.Id.ToString(),
+                                    Data = System.Text.Json.JsonSerializer.Serialize(new
+                                    {
+                                        ProjectId = project.Id,
+                                        ProjectName = project.Name,
+                                        CompletedAt = DateTime.UtcNow,
+                                        EventType = "ProjectCompleted"
+                                    })
+                                };
+
+                                await _notificationService.CreateInAppNotificationAsync(memberNotification);
+
+                                // Send email to member
+                                var member = projectMember.Member;
+                                if (member != null)
+                                {
+                                    _notificationService.SendEmailNotification(
+                                        member.Email!,
+                                        "Dự án hoàn thành",
+                                        $"Xin chào {member.FullName},<br/><br/>" +
+                                        $"Tin tuyệt vời! Dự án <strong>{project.Name}</strong> đã được hoàn thành thành công.<br/><br/>" +
+                                        $"Cảm ơn sự chăm chỉ và cống hiến của bạn cho dự án này. Đóng góp của bạn rất quan trọng!");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log but continue processing other members
+                                Console.WriteLine($"Failed to send notification to member {projectMember.MemberId}: {ex.Message}");
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the update operation
+                    Console.WriteLine($"Failed to send completion notifications: {ex.Message}");
+                }
+            }
 
             var response = new GetProjectResponse
             {

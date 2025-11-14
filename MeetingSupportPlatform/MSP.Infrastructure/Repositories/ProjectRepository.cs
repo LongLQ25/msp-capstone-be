@@ -88,5 +88,17 @@ namespace MSP.Infrastructure.Repositories
                 .Include(p => p.CreatedBy)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Project>> GetOverdueInProgressProjectsAsync(DateTime currentTime, string inProgressStatus)
+        {
+            return await _context.Projects
+                .Where(p =>
+                    !p.IsDeleted &&
+                    p.Status == inProgressStatus &&
+                    p.EndDate.HasValue &&
+                    p.EndDate.Value.Date < currentTime.Date)
+                .Include(p => p.Owner)
+                .ToListAsync();
+        }
     }
 }

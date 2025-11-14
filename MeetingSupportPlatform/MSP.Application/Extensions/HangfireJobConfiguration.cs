@@ -92,6 +92,17 @@ namespace MSP.Application.Extensions
                     TimeZone = vietnamTimeZone
                 });
 
+            // 7. Project Completion Reminder
+            // Send reminder notifications for projects that are past EndDate but still InProgress
+            RecurringJob.AddOrUpdate<ProjectCompletionReminderCronJobService>(
+                "send-project-completion-reminders",
+                service => service.SendCompletionRemindersAsync(),
+                Cron.Daily(), // Run daily at 12:00 AM Vietnam time
+                new RecurringJobOptions
+                {
+                    TimeZone = vietnamTimeZone
+                });
+
             return app;
         }
 
@@ -157,6 +168,15 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<TaskReminderCronJobService>(
                 "send-task-deadline-reminders",
                 service => service.SendDeadlineRemindersAsync(),
+                Cron.Daily(),
+                new RecurringJobOptions
+                {
+                    TimeZone = vietnamTimeZone
+                });
+
+            RecurringJob.AddOrUpdate<ProjectCompletionReminderCronJobService>(
+                "send-project-completion-reminders",
+                service => service.SendCompletionRemindersAsync(),
                 Cron.Daily(),
                 new RecurringJobOptions
                 {

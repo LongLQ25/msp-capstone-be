@@ -82,8 +82,8 @@ namespace MSP.Application.Services.Implementations.Project
                     {
                         var daysRemaining = (project.EndDate!.Value - now).Days;
                         var deadlineText = daysRemaining == 0 
-                            ? "today" 
-                            : $"in {daysRemaining} day{(daysRemaining > 1 ? "s" : "")}";
+                            ? "hôm nay" 
+                            : $"trong {daysRemaining} ngày n?a";
 
                         _logger.LogWarning(
                             "Project {ProjectId} ('{Name}') is nearing deadline. EndDate: {EndDate} ({DeadlineText})",
@@ -98,10 +98,10 @@ namespace MSP.Application.Services.Implementations.Project
                             await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
                             {
                                 UserId = project.OwnerId,
-                                Title = "?? Project Deadline Warning",
-                                Message = $"Project '{project.Name}' is approaching its deadline {deadlineText} (End Date: {project.EndDate:yyyy-MM-dd}). Please review the project progress.",
+                                Title = "?? C?nh báo h?n chót d? án",
+                                Message = $"D? án '{project.Name}' s?p ??n h?n {deadlineText} (Ngày k?t thúc: {project.EndDate:dd/MM/yyyy}). Vui lòng xem xét ti?n ?? d? án.",
                                 Type = NotificationTypeEnum.InApp.ToString(),
-                                Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:yyyy-MM-dd}\",\"daysRemaining\":{daysRemaining}}}"
+                                Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
                             });
 
                             notificationsSent++;
@@ -138,10 +138,10 @@ namespace MSP.Application.Services.Implementations.Project
                                     await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
                                     {
                                         UserId = projectMember.MemberId,
-                                        Title = "?? Project Deadline Warning",
-                                        Message = $"Project '{project.Name}' is approaching its deadline {deadlineText} (End Date: {project.EndDate:yyyy-MM-dd}). Please complete your tasks on time.",
+                                        Title = "?? C?nh báo h?n chót d? án",
+                                        Message = $"D? án '{project.Name}' s?p ??n h?n {deadlineText} (Ngày k?t thúc: {project.EndDate:dd/MM/yyyy}). Vui lòng hoàn thành công vi?c ?úng h?n.",
                                         Type = NotificationTypeEnum.InApp.ToString(),
-                                        Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:yyyy-MM-dd}\",\"daysRemaining\":{daysRemaining}}}"
+                                        Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
                                     });
 
                                     notificationsSent++;
