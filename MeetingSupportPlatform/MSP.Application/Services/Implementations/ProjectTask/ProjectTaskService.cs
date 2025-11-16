@@ -144,6 +144,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Status = newTask.Status,
                 StartDate = newTask.StartDate,
                 EndDate = newTask.EndDate,
+                IsOverdue = newTask.IsOverdue,
                 CreatedAt = newTask.CreatedAt,
                 UpdatedAt = newTask.UpdatedAt,
                 User = user == null ? null : new GetUserResponse
@@ -195,6 +196,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -251,6 +253,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Status = task.Status,
                     StartDate = task.StartDate,
                     EndDate = task.EndDate,
+                    IsOverdue = task.IsOverdue,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
                     User = task.User == null ? null : new GetUserResponse
@@ -313,6 +316,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Status = task.Status,
                     StartDate = task.StartDate,
                     EndDate = task.EndDate,
+                    IsOverdue = task.IsOverdue,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
                     User = task.User == null ? null : new GetUserResponse
@@ -483,6 +487,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -527,6 +532,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -568,6 +574,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse

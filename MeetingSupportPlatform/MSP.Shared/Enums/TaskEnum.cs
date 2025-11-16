@@ -4,8 +4,9 @@
     {
         NotStarted,
         InProgress,
-        Paused,
-        OverDue,
-        Completed
+        ReadyToReview,
+        ReOpened,
+        Cancelled,
+        Done
     }
 }

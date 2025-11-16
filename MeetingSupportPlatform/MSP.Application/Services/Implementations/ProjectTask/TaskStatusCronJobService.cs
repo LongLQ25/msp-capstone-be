@@ -12,7 +12,7 @@ using MSP.Shared.Enums;
 namespace MSP.Application.Services.Implementations.ProjectTask
 {
     /// <summary>
-    /// Service to automatically check and update task status to OverDue using Hangfire
+    /// Service to automatically check and update task IsOverdue flag using Hangfire
     /// </summary>
     public class TaskStatusCronJobService
     {
@@ -37,7 +37,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         }
 
         /// <summary>
-        /// Check and update overdue tasks to OverDue status and send notifications
+        /// Check and update overdue tasks to set IsOverdue = true and send notifications
         /// This method will be called by Hangfire Recurring Job
         /// </summary>
         public async Task UpdateOverdueTasksAsync()
@@ -48,11 +48,15 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 
                 var now = DateTime.UtcNow;
                 
-                // Query overdue tasks directly from database
-                var tasksToUpdate = await _projectTaskRepository.GetOverdueTasksAsync(
-                    now,
-                    TaskEnum.OverDue.ToString(),
-                    TaskEnum.Completed.ToString());
+                // Query overdue tasks that are not Done or Cancelled and haven't been marked as overdue yet
+                var tasksToUpdate = await _projectTaskRepository.FindAsync(
+                    predicate: task =>
+                        !task.IsDeleted &&
+                        task.EndDate.HasValue &&
+                        task.EndDate.Value < now &&
+                        !task.IsOverdue &&
+                        task.Status != TaskEnum.Done.ToString() &&
+                        task.Status != TaskEnum.Cancelled.ToString());
 
                 if (tasksToUpdate.Any())
                 {
@@ -62,17 +66,17 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     
                     foreach (var task in tasksToUpdate)
                     {
-                        var oldStatus = task.Status;
-                        task.Status = TaskEnum.OverDue.ToString();
+                        // Set IsOverdue flag without changing Status
+                        task.IsOverdue = true;
                         task.UpdatedAt = now;
                         
                         await _projectTaskRepository.UpdateAsync(task);
                         
                         _logger.LogInformation(
-                            "Updated task {TaskId} ('{TaskTitle}') from {OldStatus} to OverDue. EndDate was {EndDate}", 
+                            "Updated task {TaskId} ('{TaskTitle}') IsOverdue flag. Status remains {Status}. EndDate was {EndDate}", 
                             task.Id, 
                             task.Title,
-                            oldStatus,
+                            task.Status,
                             task.EndDate);
 
                         // Send notification if task is assigned to a user
@@ -104,6 +108,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                                 ProjectName = project.Name,
                                                 DueDate = task.EndDate,
                                                 DaysOverdue = daysOverdue,
+                                                Status = task.Status,
                                                 NotificationType = "TaskOverdue"
                                             })
                                         };
