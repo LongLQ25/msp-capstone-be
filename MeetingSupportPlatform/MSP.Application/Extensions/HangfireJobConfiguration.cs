@@ -48,7 +48,7 @@ namespace MSP.Application.Extensions
 
             // 3. Project Status Cron Job
             // Automatically update project statuses
-            // - Scheduled ? InProgress when StartDate is reached
+            // - NotStarted to InProgress when StartDate is reached
             // - Send deadline warnings to Owner and Members (7 days before EndDate)
             RecurringJob.AddOrUpdate<ProjectStatusCronJobService>(
                 "update-project-statuses",
