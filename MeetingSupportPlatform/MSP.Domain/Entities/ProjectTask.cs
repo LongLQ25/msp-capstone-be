@@ -10,6 +10,9 @@ namespace MSP.Domain.Entities
         public Guid? UserId { get; set; }
         public virtual User? User { get; set; }
 
+        public Guid? ReviewerId { get; set; }
+        public virtual User? Reviewer { get; set; }
+
         public Guid? TodoId { get; set; }
         public virtual Todo? Todo { get; set; }
 

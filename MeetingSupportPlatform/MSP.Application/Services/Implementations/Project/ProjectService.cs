@@ -657,5 +657,62 @@ namespace MSP.Application.Services.Implementations.Project
             return ApiResponse<List<GetProjectMemberResponse>>.SuccessResponse(response);
         }
 
+        public async Task<ApiResponse<List<GetProjectMemberResponse>>> GetProjectMembersByRoleAsync(Guid projectId, string role)
+        {
+            var project = await _projectRepository.GetByIdAsync(projectId);
+            if (project == null)
+            {
+                return ApiResponse<List<GetProjectMemberResponse>>.ErrorResponse(null, "Project not found");
+            }
+
+            var projectMembers = await _projectMemberRepository.GetProjectMembersByProjectIdAsync(projectId);
+            if (projectMembers == null || !projectMembers.Any())
+            {
+                return ApiResponse<List<GetProjectMemberResponse>>.ErrorResponse(null, "No members found for the specified project");
+            }
+
+            var response = new List<GetProjectMemberResponse>();
+
+            foreach (var pm in projectMembers)
+            {
+                var roles = await _userManager.GetRolesAsync(pm.Member);
+                var userRole = roles.FirstOrDefault() ?? string.Empty;
+
+                // Filter by role
+                if (!string.IsNullOrEmpty(role) && !userRole.Equals(role, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                response.Add(new GetProjectMemberResponse
+                {
+                    Id = pm.Id,
+                    ProjectId = pm.ProjectId,
+                    UserId = pm.MemberId,
+                    JoinedAt = pm.JoinedAt,
+                    Member = new GetUserResponse
+                    {
+                        Id = pm.Member.Id,
+                        FullName = pm.Member.FullName,
+                        Email = pm.Member.Email,
+                        AvatarUrl = pm.Member.AvatarUrl,
+                        Role = userRole
+                    }
+                });
+            }
+
+            if (response.Count == 0)
+            {
+                return ApiResponse<List<GetProjectMemberResponse>>.ErrorResponse(null, $"No {role}s found for the specified project");
+            }
+
+            return ApiResponse<List<GetProjectMemberResponse>>.SuccessResponse(response);
+        }
+
+        public async Task<ApiResponse<List<GetProjectMemberResponse>>> GetProjectManagersAsync(Guid projectId)
+        {
+            return await GetProjectMembersByRoleAsync(projectId, "ProjectManager");
+        }
+
     }
 }

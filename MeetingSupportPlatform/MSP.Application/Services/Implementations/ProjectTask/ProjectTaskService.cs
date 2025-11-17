@@ -58,6 +58,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             {
                 ProjectId = request.ProjectId,
                 UserId = request.UserId,  // UserId nullable, có thể là null
+                ReviewerId = null,
                 Title = request.Title,
                 Description = request.Description,
                 Status = request.Status,
@@ -152,6 +153,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = newTask.Id,
                 ProjectId = newTask.ProjectId,
                 UserId = newTask.UserId,
+                ReviewerId = newTask.ReviewerId,
                 Title = newTask.Title,
                 Description = newTask.Description,
                 Status = newTask.Status,
@@ -204,6 +206,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
@@ -218,6 +221,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {
@@ -242,6 +252,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 predicate: p => p.ProjectId == projectId && !p.IsDeleted,
                 include: query => query
                     .Include(p => p.User)
+                    .Include(p => p.Reviewer)
                     .Include(p => p.Milestones),
                 pageNumber: request.PageIndex,
                 pageSize: request.PageSize,
@@ -261,6 +272,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Id = task.Id,
                     ProjectId = task.ProjectId,
                     UserId = task.UserId,
+                    ReviewerId = task.ReviewerId,
                     Title = task.Title,
                     Description = task.Description,
                     Status = task.Status,
@@ -275,6 +287,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                         Email = task.User.Email,
                         FullName = task.User.FullName,
                         AvatarUrl = task.User.AvatarUrl,
+                    },
+                    Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                    {
+                        Id = task.Reviewer.Id,
+                        Email = task.Reviewer.Email,
+                        FullName = task.Reviewer.FullName,
+                        AvatarUrl = task.Reviewer.AvatarUrl,
                     },
                     Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                     {
@@ -304,6 +323,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 predicate: p => p.UserId == userId && p.ProjectId == projectId && !p.IsDeleted,
                 include: query => query
                     .Include(p => p.User)
+                    .Include(p => p.Reviewer)
                     .Include(p => p.Milestones),
                 pageNumber: request.PageIndex,
                 pageSize: request.PageSize,
@@ -324,6 +344,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Id = task.Id,
                     ProjectId = task.ProjectId,
                     UserId = task.UserId,
+                    ReviewerId = task.ReviewerId,
                     Title = task.Title,
                     Description = task.Description,
                     Status = task.Status,
@@ -338,6 +359,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                         Email = task.User.Email,
                         FullName = task.User.FullName,
                         AvatarUrl = task.User.AvatarUrl,
+                    },
+                    Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                    {
+                        Id = task.Reviewer.Id,
+                        Email = task.Reviewer.Email,
+                        FullName = task.Reviewer.FullName,
+                        AvatarUrl = task.Reviewer.AvatarUrl,
                     },
                     Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                     {
@@ -378,6 +406,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             var oldStartDate = task.StartDate;
             var oldEndDate = task.EndDate;
             var oldUserId = task.UserId;
+            var oldReviewerId = task.ReviewerId;
 
             User? newUser = null;
             if (request.UserId.HasValue)
@@ -386,6 +415,23 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 if (newUser == null)
                 {
                     return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
+                }
+            }
+
+            User? newReviewer = null;
+            if (request.ReviewerId.HasValue)
+            {
+                newReviewer = await _userManager.FindByIdAsync(request.ReviewerId.Value.ToString());
+                if (newReviewer == null)
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Reviewer not found");
+                }
+
+                // Verify reviewer is a ProjectManager
+                var reviewerRoles = await _userManager.GetRolesAsync(newReviewer);
+                if (!reviewerRoles.Contains("ProjectManager"))
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Reviewer must be a Project Manager");
                 }
             }
 
@@ -426,6 +472,46 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                         request.Status,
                         request.ActorId);
                     task.Status = request.Status;
+                    
+                    // Gửi notification cho reviewer khi status change to ReadyToReview
+                    if (request.Status == TaskEnum.ReadyToReview.ToString() && task.ReviewerId.HasValue)
+                    {
+                        var reviewer = task.Reviewer ?? await _userManager.FindByIdAsync(task.ReviewerId.Value.ToString());
+                        if (reviewer != null)
+                        {
+                            var reviewNotification = new CreateNotificationRequest
+                            {
+                                UserId = task.ReviewerId.Value,
+                                ActorId = request.ActorId,
+                                Title = "Công việc sẵn sàng để review",
+                                Message = $"Công việc '{task.Title}' đã sẵn sàng để bạn review trong dự án {project.Name}",
+                                Type = NotificationTypeEnum.TaskUpdate.ToString(),
+                                EntityId = task.Id.ToString(),
+                                Data = System.Text.Json.JsonSerializer.Serialize(new
+                                {
+                                    TaskId = task.Id,
+                                    TaskTitle = task.Title,
+                                    ProjectId = project.Id,
+                                    ProjectName = project.Name,
+                                    AssigneeId = task.UserId,
+                                    AssigneeName = task.User?.FullName,
+                                    Status = request.Status
+                                })
+                            };
+
+                            await _notificationService.CreateInAppNotificationAsync(reviewNotification);
+
+                            _notificationService.SendEmailNotification(
+                                reviewer.Email!,
+                                "Công việc sẵn sàng để review",
+                                $"Xin chào {reviewer.FullName},<br/><br/>" +
+                                $"Công việc <strong>{task.Title}</strong> đã sẵn sàng để review.<br/>" +
+                                $"Dự án: {project.Name}<br/>" +
+                                $"Người thực hiện: {task.User?.FullName ?? "N/A"}<br/><br/>" +
+                                $"Vui lòng kiểm tra và review công việc này."
+                            );
+                        }
+                    }
                 }
 
                 // AUTO TRACK: StartDate change
@@ -476,6 +562,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     // Note: Không track khi unassign (UserId từ có → null)
 
                     task.UserId = request.UserId;
+                }
+
+                // Handle Reviewer changes
+                if (request.ReviewerId != oldReviewerId)
+                {
+                    task.ReviewerId = request.ReviewerId;
                 }
 
                 task.UpdatedAt = DateTime.UtcNow;
@@ -555,6 +647,43 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     await _notificationService.CreateInAppNotificationAsync(notificationRequest);
                     _notificationService.SendEmailNotification(newUser.Email!, emailSubject, emailBody);
                 }
+
+                // Gửi notification nếu reviewer changed
+                if (request.ReviewerId.HasValue && request.ReviewerId != oldReviewerId && newReviewer != null)
+                {
+                    var reviewerNotification = new CreateNotificationRequest
+                    {
+                        UserId = request.ReviewerId.Value,
+                        ActorId = request.ActorId,
+                        Title = "Bạn được chỉ định làm người review",
+                        Message = $"Bạn được chỉ định review công việc: {task.Title} trong dự án {project.Name}",
+                        Type = NotificationTypeEnum.TaskAssignment.ToString(),
+                        EntityId = task.Id.ToString(),
+                        Data = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            TaskId = task.Id,
+                            TaskTitle = task.Title,
+                            ProjectId = project.Id,
+                            ProjectName = project.Name,
+                            DueDate = task.EndDate,
+                            AssigneeId = task.UserId,
+                            AssigneeName = task.User?.FullName
+                        })
+                    };
+
+                    await _notificationService.CreateInAppNotificationAsync(reviewerNotification);
+
+                    _notificationService.SendEmailNotification(
+                        newReviewer.Email!,
+                        "Bạn được chỉ định làm người review",
+                        $"Xin chào {newReviewer.FullName},<br/><br/>" +
+                        $"Bạn được chỉ định làm người review cho công việc: <strong>{task.Title}</strong><br/>" +
+                        $"Dự án: {project.Name}<br/>" +
+                        $"Người thực hiện: {task.User?.FullName ?? "Chưa có"}<br/>" +
+                        $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                        $"Vui lòng theo dõi tiến độ và review công việc này."
+                    );
+                }
             }
             catch (Exception)
             {
@@ -567,6 +696,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
@@ -581,6 +711,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {
@@ -612,6 +749,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
@@ -626,6 +764,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {
@@ -654,6 +799,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
@@ -668,6 +814,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {

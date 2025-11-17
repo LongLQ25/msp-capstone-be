@@ -183,6 +183,16 @@ namespace MSP.Application.Services.Implementations.TaskHistory
 
         public async Task<ApiResponse<IEnumerable<GetTaskHistoryResponse>>> GetTaskHistoriesByTaskIdAsync(Guid taskId)
         {
+            // Validate task exists
+            var task = await _taskRepo.GetByIdAsync(taskId);
+            if (task == null)
+            {
+                return ApiResponse<IEnumerable<GetTaskHistoryResponse>>.ErrorResponse(
+                    null,
+                    "Task not found");
+            }
+
+
             var requests = await _taskHistoryRepo.GetTaskHistoriesByTaskIdAsync(taskId);
             var rs = requests.Select(trr => new GetTaskHistoryResponse
             {

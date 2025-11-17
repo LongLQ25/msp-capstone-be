@@ -17,5 +17,7 @@ namespace MSP.Application.Services.Interfaces.Project
         Task<ApiResponse<GetProjectMemberResponse>> AddProjectMemberAsync(AddProjectMemeberRequest request);
         Task<ApiResponse<string>> RemoveProjectMemberAsync(Guid pmId);
         Task<ApiResponse<List<GetProjectMemberResponse>>> GetProjectMembersAsync(Guid projectId);
+        Task<ApiResponse<List<GetProjectMemberResponse>>> GetProjectMembersByRoleAsync(Guid projectId, string role);
+        Task<ApiResponse<List<GetProjectMemberResponse>>> GetProjectManagersAsync(Guid projectId);
     }
 }

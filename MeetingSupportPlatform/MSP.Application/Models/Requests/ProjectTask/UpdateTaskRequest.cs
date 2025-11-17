@@ -5,6 +5,7 @@
         public Guid Id { get; set; }
         public Guid ProjectId { get; set; }
         public Guid? UserId { get; set; }
+        public Guid? ReviewerId { get; set; }
         public Guid ActorId { get; set; }  // Person who updates the task
         public string Title { get; set; }
         public string? Description { get; set; }

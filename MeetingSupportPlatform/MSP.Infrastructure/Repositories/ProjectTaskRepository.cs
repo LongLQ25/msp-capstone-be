@@ -12,6 +12,7 @@ namespace MSP.Infrastructure.Repositories
             return await _context.ProjectTasks
                 .Include(pt => pt.Milestones)
                 .Include(pt => pt.User)
+                .Include(pt => pt.Reviewer)
                 .Where(pt => pt.Milestones.Any(m => m.Id == milestoneId) && !pt.IsDeleted)
                 .ToListAsync();
         }
@@ -21,6 +22,7 @@ namespace MSP.Infrastructure.Repositories
             return await _context.ProjectTasks
                 .Include(pt => pt.Milestones)
                 .Include(pt => pt.User)
+                .Include(pt => pt.Reviewer)
                 .FirstOrDefaultAsync(pt => pt.Id == id && !pt.IsDeleted);
         }
 
@@ -30,6 +32,7 @@ namespace MSP.Infrastructure.Repositories
                 .Where(pt => pt.ProjectId == projectId && !pt.IsDeleted)
                 .Include(pt => pt.Milestones)
                 .Include(pt => pt.User)
+                .Include(pt => pt.Reviewer)
                 .ToListAsync();
         }
 
@@ -55,6 +58,7 @@ namespace MSP.Infrastructure.Repositories
             return await _context.ProjectTasks
                 .Where(pt => pt.ReferencingTodos.Any(t => t.Id == todoId) && !pt.IsDeleted)
                 .Include(pt => pt.User)
+                .Include(pt => pt.Reviewer)
                 .Include(pt => pt.Milestones)
                  .ToListAsync();
         }
