@@ -171,6 +171,11 @@ namespace MSP.Infrastructure.Persistence.DBContext
                     .HasForeignKey(t => t.UserId)
                     .OnDelete(DeleteBehavior.Restrict);
 
+                entity.HasOne(t => t.Reviewer)
+                    .WithMany()
+                    .HasForeignKey(t => t.ReviewerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasOne(t => t.Todo)
                     .WithMany(todo => todo.ProjectTasks)
                     .HasForeignKey(t => t.TodoId)

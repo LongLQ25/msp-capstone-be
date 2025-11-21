@@ -41,23 +41,23 @@ namespace MSP.Application.Services.Implementations.Project
                 int updatedCount = 0;
                 int notificationsSent = 0;
 
-                // 1. Update projects from Scheduled ? InProgress
-                var scheduledProjects = await _projectRepository.GetScheduledProjectsToStartAsync(
+                // 1. Update projects from NotStarted to InProgress
+                var notStartedProjects = await _projectRepository.GetNotStartedProjectsProjectsToStartAsync(
                     now,
-                    ProjectStatusEnum.Scheduled.ToString());
+                    ProjectStatusEnum.NotStarted.ToString());
 
-                if (scheduledProjects.Any())
+                if (notStartedProjects.Any())
                 {
-                    _logger.LogInformation("Found {Count} scheduled projects to start", scheduledProjects.Count());
+                    _logger.LogInformation("Found {Count} not started projects to start", notStartedProjects.Count());
 
-                    foreach (var project in scheduledProjects)
+                    foreach (var project in notStartedProjects)
                     {
                         project.Status = ProjectStatusEnum.InProgress.ToString();
                         project.UpdatedAt = now;
                         await _projectRepository.UpdateAsync(project);
 
                         _logger.LogInformation(
-                            "Updated project {ProjectId} ('{Name}') from Scheduled to InProgress. StartDate was {StartDate}",
+                            "Updated project {ProjectId} ('{Name}') from NotStarted to InProgress. StartDate was {StartDate}",
                             project.Id,
                             project.Name,
                             project.StartDate);

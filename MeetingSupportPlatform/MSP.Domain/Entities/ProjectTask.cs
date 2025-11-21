@@ -10,6 +10,9 @@ namespace MSP.Domain.Entities
         public Guid? UserId { get; set; }
         public virtual User? User { get; set; }
 
+        public Guid? ReviewerId { get; set; }
+        public virtual User? Reviewer { get; set; }
+
         public Guid? TodoId { get; set; }
         public virtual Todo? Todo { get; set; }
 
@@ -18,6 +21,7 @@ namespace MSP.Domain.Entities
         public string Status { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
+        public bool IsOverdue { get; set; }
 
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public virtual ICollection<Milestone> Milestones { get; set; } = new List<Milestone>();

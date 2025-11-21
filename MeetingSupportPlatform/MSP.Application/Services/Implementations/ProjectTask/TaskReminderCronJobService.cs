@@ -50,11 +50,11 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 var oneDayLater = now.AddDays(1);
                 var twoDaysLater = now.AddDays(2);
 
-                // Get tasks that are due in 1-2 days and not completed/overdue
+                // Get tasks that are due in 1-2 days and not completed
                 var upcomingTasks = await _projectTaskRepository.GetTasksWithUpcomingDeadlinesAsync(
                     oneDayLater,
                     twoDaysLater,
-                    new[] { TaskEnum.Completed.ToString(), TaskEnum.OverDue.ToString() });
+                    new[] { TaskEnum.Done.ToString(), TaskEnum.Cancelled.ToString() });
 
                 if (upcomingTasks.Any())
                 {
@@ -62,6 +62,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
 
                     foreach (var task in upcomingTasks)
                     {
+                        // Skip if task is already overdue (edge case: cron job ran late)
+                        if (task.IsOverdue)
+                        {
+                            _logger.LogInformation("Skipping task {TaskId} as it's already marked as overdue", task.Id);
+                            continue;
+                        }
+
                         // Only send reminder if task is assigned to a user
                         if (task.UserId.HasValue)
                         {

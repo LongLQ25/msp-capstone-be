@@ -2,9 +2,10 @@
 {
     public enum ProjectStatusEnum
     {
-        Scheduled,
+        NotStarted,
         InProgress,
-        Paused,
-        Completed
+        OnHold,
+        Completed,
+        Cancelled
     }
 }

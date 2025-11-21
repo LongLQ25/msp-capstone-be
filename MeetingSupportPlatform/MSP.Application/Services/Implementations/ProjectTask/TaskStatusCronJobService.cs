@@ -1,4 +1,4 @@
-using System;
+Ôªøusing System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
@@ -12,7 +12,7 @@ using MSP.Shared.Enums;
 namespace MSP.Application.Services.Implementations.ProjectTask
 {
     /// <summary>
-    /// Service to automatically check and update task status to OverDue using Hangfire
+    /// Service to automatically check and update task IsOverdue flag using Hangfire
     /// </summary>
     public class TaskStatusCronJobService
     {
@@ -37,7 +37,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
         }
 
         /// <summary>
-        /// Check and update overdue tasks to OverDue status and send notifications
+        /// Check and update overdue tasks to set IsOverdue = true and send notifications
         /// This method will be called by Hangfire Recurring Job
         /// </summary>
         public async Task UpdateOverdueTasksAsync()
@@ -48,11 +48,15 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 
                 var now = DateTime.UtcNow;
                 
-                // Query overdue tasks directly from database
-                var tasksToUpdate = await _projectTaskRepository.GetOverdueTasksAsync(
-                    now,
-                    TaskEnum.OverDue.ToString(),
-                    TaskEnum.Completed.ToString());
+                // Query overdue tasks that are not Done or Cancelled and haven't been marked as overdue yet
+                var tasksToUpdate = await _projectTaskRepository.FindAsync(
+                    predicate: task =>
+                        !task.IsDeleted &&
+                        task.EndDate.HasValue &&
+                        task.EndDate.Value < now &&
+                        !task.IsOverdue &&
+                        task.Status != TaskEnum.Done.ToString() &&
+                        task.Status != TaskEnum.Cancelled.ToString());
 
                 if (tasksToUpdate.Any())
                 {
@@ -62,17 +66,17 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     
                     foreach (var task in tasksToUpdate)
                     {
-                        var oldStatus = task.Status;
-                        task.Status = TaskEnum.OverDue.ToString();
+                        // Set IsOverdue flag without changing Status
+                        task.IsOverdue = true;
                         task.UpdatedAt = now;
                         
                         await _projectTaskRepository.UpdateAsync(task);
                         
                         _logger.LogInformation(
-                            "Updated task {TaskId} ('{TaskTitle}') from {OldStatus} to OverDue. EndDate was {EndDate}", 
+                            "Updated task {TaskId} ('{TaskTitle}') IsOverdue flag. Status remains {Status}. EndDate was {EndDate}", 
                             task.Id, 
                             task.Title,
-                            oldStatus,
+                            task.Status,
                             task.EndDate);
 
                         // Send notification if task is assigned to a user
@@ -92,8 +96,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                         var notificationRequest = new CreateNotificationRequest
                                         {
                                             UserId = task.UserId.Value,
-                                            Title = "CÙng vi?c qu· h?n",
-                                            Message = $"CÙng vi?c '{task.Title}' ?„ qu· h?n {daysOverdue} ng‡y",
+                                            Title = "C√¥ng vi·ªác qu√° h·∫°n",
+                                            Message = $"C√¥ng vi·ªác '{task.Title}' ƒë√£ qu√° h·∫°n {daysOverdue} ng√†y",
                                             Type = NotificationTypeEnum.TaskUpdate.ToString(),
                                             EntityId = task.Id.ToString(),
                                             Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -104,6 +108,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                                 ProjectName = project.Name,
                                                 DueDate = task.EndDate,
                                                 DaysOverdue = daysOverdue,
+                                                Status = task.Status,
                                                 NotificationType = "TaskOverdue"
                                             })
                                         };
@@ -113,13 +118,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                         // Send email notification
                                         _notificationService.SendEmailNotification(
                                             user.Email!,
-                                            "CÙng vi?c qu· h?n",
-                                            $"Xin ch‡o {user.FullName},<br/><br/>" +
-                                            $"CÙng vi?c <strong>{task.Title}</strong> c?a b?n hi?n ?„ qu· h?n {daysOverdue} ng‡y.<br/><br/>" +
-                                            $"<strong>D? ·n:</strong> {project.Name}<br/>" +
-                                            $"<strong>H?n chÛt:</strong> {task.EndDate:dd/MM/yyyy}<br/>" +
-                                            $"<strong>Tr?ng th·i:</strong> {task.Status}<br/><br/>" +
-                                            $"Vui lÚng ho‡n th‡nh cÙng vi?c n‡y c‡ng s?m c‡ng t?t.");
+                                            "C√¥ng vi·ªác qu√° h·∫°n",
+                                            $"Xin ch√†o {user.FullName},<br/><br/>" +
+                                            $"C√¥ng vi·ªác <strong>{task.Title}</strong> c·ªßa b·∫°n hi·ªán ƒë√£ qu√° h·∫°n {daysOverdue} ng√†y.<br/><br/>" +
+                                            $"<strong>D·ª± √°n:</strong> {project.Name}<br/>" +
+                                            $"<strong>H·∫°n ch√≥t:</strong> {task.EndDate:dd/MM/yyyy}<br/>" +
+                                            $"<strong>Tr·∫°ng th√°i:</strong> {task.Status}<br/><br/>" +
+                                            $"Vui l√≤ng ho√†n th√†nh c√¥ng vi·ªác n√†y c√†ng s·ªõm c√†ng t·ªët.");
 
                                         notificationsSent++;
 

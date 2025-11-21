@@ -17,6 +17,7 @@ using MSP.Application.Services.Implementations.Summarize;
 using MSP.Application.Services.Implementations.TaskHistory;
 using MSP.Application.Services.Implementations.Todos;
 using MSP.Application.Services.Implementations.Users;
+using MSP.Application.Services.Implementations.Comment;
 using MSP.Application.Services.Interfaces.Auth;
 using MSP.Application.Services.Interfaces.Limitation;
 using MSP.Application.Services.Interfaces.Meeting;
@@ -31,6 +32,7 @@ using MSP.Application.Services.Interfaces.Summarize;
 using MSP.Application.Services.Interfaces.TaskHistory;
 using MSP.Application.Services.Interfaces.Todos;
 using MSP.Application.Services.Interfaces.Users;
+using MSP.Application.Services.Interfaces.Comment;
 using PayOS;
 using MSP.Application.Services.Interfaces.Subscription;
 
@@ -57,6 +59,7 @@ namespace MSP.Application.Extensions
             services.AddScoped<IPaymentService, PayOSService>();
             services.AddScoped<ISubscriptionService, SubscriptionService>();
             services.AddScoped<ILimitationService, LimitationService>();
+            services.AddScoped<ICommentService, CommentService>();
             
             // Register Hangfire Job Services
             services.AddScoped<TaskStatusCronJobService>();

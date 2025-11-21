@@ -158,5 +158,29 @@ namespace MSP.WebAPI.Controllers
             }
             return Ok(response);
         }
+
+        [HttpGet("{projectId}/members")]
+        public async Task<IActionResult> GetProjectMembersByRole([FromRoute] Guid projectId, [FromQuery] string? role = "Member")
+        {
+            var response = await _projectService.GetProjectMembersByRoleAsync(projectId, role ?? "Member");
+            if (!response.Success)
+            {
+                _logger.LogError("GetProjectMembersByRole failed: {Message}", response.Message);
+                return Ok(response);
+            }
+            return Ok(response);
+        }
+
+        [HttpGet("{projectId}/project-managers")]
+        public async Task<IActionResult> GetProjectManagers([FromRoute] Guid projectId)
+        {
+            var response = await _projectService.GetProjectManagersAsync(projectId);
+            if (!response.Success)
+            {
+                _logger.LogError("GetProjectManagers failed: {Message}", response.Message);
+                return Ok(response);
+            }
+            return Ok(response);
+        }
     }
 }

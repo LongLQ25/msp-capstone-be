@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MSP.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251103154815_updateFeatureLimitation")]
-    partial class updateFeatureLimitation
+    [Migration("20251116093835_AddFieldsForTaskHistory")]
+    partial class AddFieldsForTaskHistory
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -268,6 +268,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -329,9 +332,8 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("BillingCycle")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("BillingCycle")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -467,6 +469,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsOverdue")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
@@ -510,7 +515,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime>("EndDate")
+                    b.Property<DateTime?>("EndDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsDeleted")
@@ -526,7 +531,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("StartDate")
+                    b.Property<DateTime?>("StartDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
@@ -555,6 +560,59 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.ToTable("Subscriptions");
                 });
 
+            modelBuilder.Entity("MSP.Domain.Entities.TaskHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ChangedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FieldName")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("FromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ToUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedById");
+
+                    b.HasIndex("FromUserId");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("ToUserId");
+
+                    b.ToTable("TaskHistories");
+                });
+
             modelBuilder.Entity("MSP.Domain.Entities.Todo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -578,6 +636,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -707,7 +768,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c1d2e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "8678bbd3-7d00-498b-b408-02b4e4d93818",
+                            ConcurrencyStamp = "b4370a17-1616-49e5-ae01-87aba7c4c7eb",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@gmail.com",
                             EmailConfirmed = true,
@@ -717,9 +778,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "ADMIN@GMAIL.COM",
                             NormalizedUserName = "ADMIN",
-                            PasswordHash = "AQAAAAIAAYagAAAAEKYmA6Ca3FzGAIWqgeBXxALgY/hUGZr0ZmSbEP7nInSDBPsr93BqXU8dGOJ/3JD4CA==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEDJ04ad26da+4Jlvel+3ismDh4YG9pFGfa/RreO9s3/05al3cPzgyeYDaCttB65Sow==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "edb203e5-543e-40e4-b273-35f1929278ec",
+                            SecurityStamp = "cf38a86e-05ae-48ea-9084-e45e51828eca",
                             TwoFactorEnabled = false,
                             UserName = "admin"
                         },
@@ -727,7 +788,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c2d4e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "0c2adcf4-a5f0-4b72-affe-e8cbed007b0c",
+                            ConcurrencyStamp = "33be5b23-4b70-4ffa-9b39-032c564040dc",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "member1@gmail.com",
                             EmailConfirmed = true,
@@ -737,9 +798,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "MEMBER1@GMAIL.COM",
                             NormalizedUserName = "MEMBER",
-                            PasswordHash = "AQAAAAIAAYagAAAAEC6Xe/O83IV3DHtsTU79NOSquslq4W4egIHnS86KEBcUVgMXwxMcuv9pB1nNWuVgxQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEPgsU7dapy2mImVKn1qViHdmnmeVY1yX6R5uSndk1L+68eswoOYblQdwSf5EMSubBQ==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "c77a87e6-c1de-4cb3-bd5b-508c954400d2",
+                            SecurityStamp = "565fde08-2b7f-46a5-a084-60a6f1d08ed5",
                             TwoFactorEnabled = false,
                             UserName = "Member"
                         },
@@ -747,7 +808,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("d2a5b3c4-d7e8-4789-1234-56789abcdef3"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "94bbb440-075e-4ed0-a020-932f4b34ec6c",
+                            ConcurrencyStamp = "a088a8ae-8edb-49bc-8399-ae1536276f6c",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "member2@gmail.com",
                             EmailConfirmed = true,
@@ -757,9 +818,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "MEMBER2@GMAIL.COM",
                             NormalizedUserName = "MEMBER2",
-                            PasswordHash = "AQAAAAIAAYagAAAAEJA8JRmul3bJ9R2Rxm+45RKJsfScSflHOPc4F1qA9G3uBb2Iru9jXO2lMCaJ2szGVQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAENPTXlwLa7AzMW0PHaVo8l8KZfRHywolyw0ohpWsQWSAddKyHr/Yaux+YqFH7m/BCQ==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "04aa4abb-8e97-41ff-91d0-d9bcf1a03a2d",
+                            SecurityStamp = "b3cc8599-a22c-449b-b9ea-65289efaae3c",
                             TwoFactorEnabled = false,
                             UserName = "Member2"
                         },
@@ -767,7 +828,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("e3b6c7d8-a9f0-4789-1234-56789abcdef4"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "4d0aa7d9-903b-411b-ba16-3f60cc1b4799",
+                            ConcurrencyStamp = "0bef7cfa-f791-4a93-b08a-0d01be81e9bd",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "member3@gmail.com",
                             EmailConfirmed = true,
@@ -775,11 +836,11 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             IsActive = true,
                             IsApproved = false,
                             LockoutEnabled = false,
-                            NormalizedEmail = "MEMBER2@GMAIL.COM",
+                            NormalizedEmail = "MEMBER3@GMAIL.COM",
                             NormalizedUserName = "MEMBER3",
-                            PasswordHash = "AQAAAAIAAYagAAAAEF+JgiFtg8mwoc6Lr6EZiOyPVMlX3xVgzYiFC+PjS29Zzf8Va4BMOE48fxZqiv5Kyg==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEPOs6hqwcM/Pc/NQtfpTCAzKR3NRx0BNLp4Xl2nCmyU2fZ9Ioo+NFh8oKKJszUDD5g==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "730ba803-3a76-49cc-b6b6-5405edc393f9",
+                            SecurityStamp = "7f9c2725-cb93-4965-9e3c-c4e9f9a6e0b9",
                             TwoFactorEnabled = false,
                             UserName = "Member3"
                         },
@@ -787,7 +848,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("f4c7d8e9-b1a2-4789-1234-56789abcdef5"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "2019436f-49e2-479b-83cc-3df56232ab2e",
+                            ConcurrencyStamp = "c929702c-8345-44ee-9e4f-af33244d403d",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "member4@gmail.com",
                             EmailConfirmed = true,
@@ -797,9 +858,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "MEMBER4@GMAIL.COM",
                             NormalizedUserName = "MEMBER4",
-                            PasswordHash = "AQAAAAIAAYagAAAAEHmCPAldaLTRE9KXG/F8PJfO96kEvNjgd1MRpqUoJJFqKLXvpgRPffizFxa4B2LPaQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEG5+8GhKzfzvSjeL5Fm/Vwie5ytmDDt7tbrR6Cpkfqt+y0lstC0qqd5Tn7H71HfJ3w==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "bb4e138e-640a-4744-b29f-078227dcdbc5",
+                            SecurityStamp = "2ca3ccc1-19fe-4624-abec-c49fd5152366",
                             TwoFactorEnabled = false,
                             UserName = "Member4"
                         },
@@ -807,7 +868,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c3d4e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "5b069eae-ade0-4fdd-97e1-1447988d6f32",
+                            ConcurrencyStamp = "702541bf-1863-4815-8ad3-2031cb6d410a",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "pm@gmail.com",
                             EmailConfirmed = true,
@@ -817,9 +878,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "PM@GMAIL.COM",
                             NormalizedUserName = "PROJECTMANAGER",
-                            PasswordHash = "AQAAAAIAAYagAAAAEM7z7MCXBPHOA0fApasw9Xqupl9MWkwKj/oW2bRbEoUwnqHvpWqrhe+IkXgEZo/ilQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEIKlHiQWa7nQVSfeF/oCzlx0FeL9vvEbP1rOsLG8hoC6r9MJSQtQ6jSs4gc+BfxdBg==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "f5cbb2db-88da-47b3-a5a3-e87d73a9f34d",
+                            SecurityStamp = "170675fa-855c-4631-9859-a0a5b608ac51",
                             TwoFactorEnabled = false,
                             UserName = "ProjectManager"
                         },
@@ -827,7 +888,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("c4d4e3f4-a5b6-4789-1234-56789abcdef2"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "c3d02f6b-0da5-4a21-8d73-4e03a06a852c",
+                            ConcurrencyStamp = "479ea9fb-ee92-4862-b282-46219b37fc67",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "bo1@gmail.com",
                             EmailConfirmed = true,
@@ -838,9 +899,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             NormalizedEmail = "BO1@GMAIL.COM",
                             NormalizedUserName = "BUSINESSOWNER",
                             Organization = "FPT Software",
-                            PasswordHash = "AQAAAAIAAYagAAAAEDeNZ1i1rkS9Sks8INOulSe3WzNb17jt59lWARGFWp1hRQ/0YHtADWmRGuG/9KmVnA==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEDtJhZsBZiqodyS5d9x220ZZsPhZsWT9B7Ecis4JHAJDOltcFVD62eRz1OfouqHgGw==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "dc38aa00-b206-410e-8617-6ff0c912e47c",
+                            SecurityStamp = "8f2cb858-bf00-4201-b92f-217029b9f85c",
                             TwoFactorEnabled = false,
                             UserName = "BusinessOwner"
                         },
@@ -848,7 +909,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("a5b6c7d8-e9f0-4789-1234-56789abcdef6"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "45ad9ff3-e3fc-4972-a397-f7c7251abefb",
+                            ConcurrencyStamp = "a7237d28-874e-419a-939a-83501b18ca33",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "bo2@gmail.com",
                             EmailConfirmed = true,
@@ -859,9 +920,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             NormalizedEmail = "BO2@GMAIL.COM",
                             NormalizedUserName = "BUSINESSOWNER2",
                             Organization = "VNPT Technology",
-                            PasswordHash = "AQAAAAIAAYagAAAAEFBxddc/NGJBhOsRZgskgpAq4LbpnQkvsXm88IqPns5oY94TYMeeGf7KvBjTeHRuSg==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEJIlUrS4epydsgeBi2TZu6DgjTCzw6ynLYDA3AvLtNPOUMgf+Qo6f/tqXyhQv8rlRA==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "0a1d6df1-2c8e-471e-a846-fbbde679e61f",
+                            SecurityStamp = "832b0079-e2ec-4217-9daf-cf2afdd77918",
                             TwoFactorEnabled = false,
                             UserName = "BusinessOwner2"
                         },
@@ -869,7 +930,7 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("b6c7d8e9-f0a1-4789-1234-56789abcdef7"),
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "49012698-4daa-41d7-9dd0-eb6b487b4875",
+                            ConcurrencyStamp = "99f3c792-d349-43ae-bf19-b7876df692a3",
                             CreatedAt = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "bo3@gmail.com",
                             EmailConfirmed = true,
@@ -880,9 +941,9 @@ namespace MSP.Infrastructure.Persistence.Migrations
                             NormalizedEmail = "BO3@GMAIL.COM",
                             NormalizedUserName = "BUSINESSOWNER3",
                             Organization = "CMC Corporation",
-                            PasswordHash = "AQAAAAIAAYagAAAAEGlG2wB3ZiWGjwcA5UE5JBJn0B2HijzUjlIFUoA2+zfY01A8u2/hf8Wgyf6w99gDEA==",
+                            PasswordHash = "AQAAAAIAAYagAAAAELMa5yZymzsqMiltry8m79TTky1y3l1OcPcc6j2+3G1J/ewYotVpF56kGzDBHTd8yw==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "25ed74ba-858d-4a08-b4ba-2cd37368d89b",
+                            SecurityStamp = "060e789a-3004-4e07-97c0-243587490393",
                             TwoFactorEnabled = false,
                             UserName = "BusinessOwner3"
                         });
@@ -1052,12 +1113,37 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            UserId = new Guid("d2a5b3c4-d7e8-4789-1234-56789abcdef3"),
+                            RoleId = new Guid("b1c2d3e4-f5a6-4789-1234-56789abcdef1")
+                        },
+                        new
+                        {
+                            UserId = new Guid("e3b6c7d8-a9f0-4789-1234-56789abcdef4"),
+                            RoleId = new Guid("b1c2d3e4-f5a6-4789-1234-56789abcdef1")
+                        },
+                        new
+                        {
+                            UserId = new Guid("f4c7d8e9-b1a2-4789-1234-56789abcdef5"),
+                            RoleId = new Guid("b1c2d3e4-f5a6-4789-1234-56789abcdef1")
+                        },
+                        new
+                        {
                             UserId = new Guid("c3d4e3f4-a5b6-4789-1234-56789abcdef2"),
                             RoleId = new Guid("c1d2e3f4-a5b6-4789-1234-56789abcdef2")
                         },
                         new
                         {
                             UserId = new Guid("c4d4e3f4-a5b6-4789-1234-56789abcdef2"),
+                            RoleId = new Guid("d1e2f3a4-b5c6-4789-1234-56789abcdef3")
+                        },
+                        new
+                        {
+                            UserId = new Guid("a5b6c7d8-e9f0-4789-1234-56789abcdef6"),
+                            RoleId = new Guid("d1e2f3a4-b5c6-4789-1234-56789abcdef3")
+                        },
+                        new
+                        {
+                            UserId = new Guid("b6c7d8e9-f0a1-4789-1234-56789abcdef7"),
                             RoleId = new Guid("d1e2f3a4-b5c6-4789-1234-56789abcdef3")
                         });
                 });
@@ -1109,6 +1195,21 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.HasIndex("LimitationId");
 
                     b.ToTable("PackageLimitations", (string)null);
+                });
+
+            modelBuilder.Entity("ProjectTaskTodo", b =>
+                {
+                    b.Property<Guid>("ReferencedTasksId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReferencingTodosId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ReferencedTasksId", "ReferencingTodosId");
+
+                    b.HasIndex("ReferencingTodosId");
+
+                    b.ToTable("ProjectTaskTodo");
                 });
 
             modelBuilder.Entity("MSP.Domain.Entities.Comment", b =>
@@ -1317,6 +1418,39 @@ namespace MSP.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MSP.Domain.Entities.TaskHistory", b =>
+                {
+                    b.HasOne("MSP.Domain.Entities.User", "ChangedBy")
+                        .WithMany()
+                        .HasForeignKey("ChangedById")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MSP.Domain.Entities.User", "FromUser")
+                        .WithMany()
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MSP.Domain.Entities.ProjectTask", "Task")
+                        .WithMany("TaskHistories")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MSP.Domain.Entities.User", "ToUser")
+                        .WithMany()
+                        .HasForeignKey("ToUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ChangedBy");
+
+                    b.Navigation("FromUser");
+
+                    b.Navigation("Task");
+
+                    b.Navigation("ToUser");
+                });
+
             modelBuilder.Entity("MSP.Domain.Entities.Todo", b =>
                 {
                     b.HasOne("MSP.Domain.Entities.Meeting", "Meeting")
@@ -1441,6 +1575,21 @@ namespace MSP.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ProjectTaskTodo", b =>
+                {
+                    b.HasOne("MSP.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("ReferencedTasksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MSP.Domain.Entities.Todo", null)
+                        .WithMany()
+                        .HasForeignKey("ReferencingTodosId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MSP.Domain.Entities.Meeting", b =>
                 {
                     b.Navigation("Todos");
@@ -1462,6 +1611,8 @@ namespace MSP.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MSP.Domain.Entities.ProjectTask", b =>
                 {
                     b.Navigation("Comments");
+
+                    b.Navigation("TaskHistories");
                 });
 
             modelBuilder.Entity("MSP.Domain.Entities.Todo", b =>

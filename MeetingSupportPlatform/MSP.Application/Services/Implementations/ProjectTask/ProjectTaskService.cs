@@ -1,11 +1,9 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MSP.Application.Models.Requests.ProjectTask;
-using MSP.Application.Models.Requests.TaskReassignRequest;
 using MSP.Application.Models.Responses.Auth;
 using MSP.Application.Models.Responses.Milestone;
 using MSP.Application.Models.Responses.ProjectTask;
-using MSP.Application.Models.Responses.TaskHistory;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.ProjectTask;
 using MSP.Application.Services.Interfaces.Notification;
@@ -60,6 +58,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             {
                 ProjectId = request.ProjectId,
                 UserId = request.UserId,  // UserId nullable, có thể là null
+                ReviewerId = null,
                 Title = request.Title,
                 Description = request.Description,
                 Status = request.Status,
@@ -84,66 +83,87 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 }
             }
 
-            await _projectTaskRepository.AddAsync(newTask);
-            await _projectTaskRepository.SaveChangesAsync();
-
-            // Gửi notification nếu task được assign cho user
-            if (request.UserId.HasValue && user != null)
+            var strategy = _projectTaskRepository.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                var notificationRequest = new CreateNotificationRequest
+                using var transaction = await _projectTaskRepository.BeginTransactionAsync();
+                try
                 {
-                    UserId = request.UserId.Value,
-                    ActorId = request.ActorId,
-                    Title = "Công việc mới được giao",
-                    Message = $"Bạn đã được giao công việc: {newTask.Title} trong dự án {project.Name}",
-                    Type = NotificationTypeEnum.TaskAssignment.ToString(),
-                    EntityId = newTask.Id.ToString(),
-                    Data = System.Text.Json.JsonSerializer.Serialize(new
+                    await _projectTaskRepository.AddAsync(newTask);
+                    await _projectTaskRepository.SaveChangesAsync();
+
+                    // AUTO TRACK: Tạo history cho task creation
+                    await _taskHistoryService.TrackTaskCreationAsync(
+                        newTask.Id,
+                        request.ActorId,
+                        request.UserId);
+
+                    // AUTO TRACK: Nếu có assign ngay từ đầu
+                    if (request.UserId.HasValue)
                     {
-                        TaskId = newTask.Id,
-                        TaskTitle = newTask.Title,
-                        ProjectId = project.Id,
-                        ProjectName = project.Name,
-                        DueDate = newTask.EndDate
-                    })
-                };
+                        await _taskHistoryService.TrackTaskAssignmentAsync(
+                            newTask.Id,
+                            null, // fromUserId = null (first assignment)
+                            request.UserId.Value,
+                            request.ActorId);
+                    }
 
-                await _notificationService.CreateInAppNotificationAsync(notificationRequest);
+                    await _projectTaskRepository.SaveChangesAsync();
+                    await transaction.CommitAsync();
 
-                // Gửi email notification (async via Hangfire)
-                _notificationService.SendEmailNotification(
-                    user.Email!,
-                    "Công việc mới được giao",
-                    $"Xin chào {user.FullName},<br/><br/>" +
-                    $"Bạn đã được giao công việc mới: <strong>{newTask.Title}</strong><br/>" +
-                    $"Dự án: {project.Name}<br/>" +
-                    $"Hạn chót: {newTask.EndDate:dd/MM/yyyy}<br/><br/>" +
-                    $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết."
-                );
-            }
+                    // Gửi notification nếu task được assign cho user
+                    if (request.UserId.HasValue && user != null)
+                    {
+                        var notificationRequest = new CreateNotificationRequest
+                        {
+                            UserId = request.UserId.Value,
+                            ActorId = request.ActorId,
+                            Title = "Công việc mới được giao",
+                            Message = $"Bạn đã được giao công việc: {newTask.Title} trong dự án {project.Name}",
+                            Type = NotificationTypeEnum.TaskAssignment.ToString(),
+                            EntityId = newTask.Id.ToString(),
+                            Data = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                TaskId = newTask.Id,
+                                TaskTitle = newTask.Title,
+                                ProjectId = project.Id,
+                                ProjectName = project.Name,
+                                DueDate = newTask.EndDate
+                            })
+                        };
 
-            // Tạo TaskHistory nếu có UserId
-            if (request.UserId != null)
-            {
-                var newTaskHistory = new CreateTaskHistoryRequest
+                        await _notificationService.CreateInAppNotificationAsync(notificationRequest);
+
+                        _notificationService.SendEmailNotification(
+                            user.Email!,
+                            "Công việc mới được giao",
+                            $"Xin chào {user.FullName},<br/><br/>" +
+                            $"Bạn đã được giao công việc mới: <strong>{newTask.Title}</strong><br/>" +
+                            $"Dự án: {project.Name}<br/>" +
+                            $"Hạn chót: {newTask.EndDate:dd/MM/yyyy}<br/><br/>" +
+                            $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết."
+                        );
+                    }
+                }
+                catch (Exception)
                 {
-                    TaskId = newTask.Id,
-                    FromUserId = null,
-                    ToUserId = request.UserId.Value
-                };
-                await _taskHistoryService.CreateTaskHistoryAsync(newTaskHistory);
-            }
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
 
             var response = new GetTaskResponse
             {
                 Id = newTask.Id,
                 ProjectId = newTask.ProjectId,
                 UserId = newTask.UserId,
+                ReviewerId = newTask.ReviewerId,
                 Title = newTask.Title,
                 Description = newTask.Description,
                 Status = newTask.Status,
                 StartDate = newTask.StartDate,
                 EndDate = newTask.EndDate,
+                IsOverdue = newTask.IsOverdue,
                 CreatedAt = newTask.CreatedAt,
                 UpdatedAt = newTask.UpdatedAt,
                 User = user == null ? null : new GetUserResponse
@@ -190,11 +210,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -203,6 +225,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {
@@ -227,6 +256,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 predicate: p => p.ProjectId == projectId && !p.IsDeleted,
                 include: query => query
                     .Include(p => p.User)
+                    .Include(p => p.Reviewer)
                     .Include(p => p.Milestones),
                 pageNumber: request.PageIndex,
                 pageSize: request.PageSize,
@@ -246,11 +276,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Id = task.Id,
                     ProjectId = task.ProjectId,
                     UserId = task.UserId,
+                    ReviewerId = task.ReviewerId,
                     Title = task.Title,
                     Description = task.Description,
                     Status = task.Status,
                     StartDate = task.StartDate,
                     EndDate = task.EndDate,
+                    IsOverdue = task.IsOverdue,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
                     User = task.User == null ? null : new GetUserResponse
@@ -259,6 +291,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                         Email = task.User.Email,
                         FullName = task.User.FullName,
                         AvatarUrl = task.User.AvatarUrl,
+                    },
+                    Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                    {
+                        Id = task.Reviewer.Id,
+                        Email = task.Reviewer.Email,
+                        FullName = task.Reviewer.FullName,
+                        AvatarUrl = task.Reviewer.AvatarUrl,
                     },
                     Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                     {
@@ -288,6 +327,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 predicate: p => p.UserId == userId && p.ProjectId == projectId && !p.IsDeleted,
                 include: query => query
                     .Include(p => p.User)
+                    .Include(p => p.Reviewer)
                     .Include(p => p.Milestones),
                 pageNumber: request.PageIndex,
                 pageSize: request.PageSize,
@@ -308,11 +348,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Id = task.Id,
                     ProjectId = task.ProjectId,
                     UserId = task.UserId,
+                    ReviewerId = task.ReviewerId,
                     Title = task.Title,
                     Description = task.Description,
                     Status = task.Status,
                     StartDate = task.StartDate,
                     EndDate = task.EndDate,
+                    IsOverdue = task.IsOverdue,
                     CreatedAt = task.CreatedAt,
                     UpdatedAt = task.UpdatedAt,
                     User = task.User == null ? null : new GetUserResponse
@@ -321,6 +363,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                         Email = task.User.Email,
                         FullName = task.User.FullName,
                         AvatarUrl = task.User.AvatarUrl,
+                    },
+                    Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                    {
+                        Id = task.Reviewer.Id,
+                        Email = task.Reviewer.Email,
+                        FullName = task.Reviewer.FullName,
+                        AvatarUrl = task.Reviewer.AvatarUrl,
                     },
                     Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                     {
@@ -354,135 +403,328 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Project not found or has been deleted");
             }
 
-            // Lưu UserId cũ để so sánh
+            // Lưu giá trị cũ để track changes
+            var oldTitle = task.Title;
+            var oldDescription = task.Description;
+            var oldStatus = task.Status;
+            var oldStartDate = task.StartDate;
+            var oldEndDate = task.EndDate;
             var oldUserId = task.UserId;
+            var oldReviewerId = task.ReviewerId;
 
-            User? user = null;
+            User? newUser = null;
             if (request.UserId.HasValue)
             {
-                user = await _userManager.FindByIdAsync(request.UserId.Value.ToString());
-                if (user == null)
+                newUser = await _userManager.FindByIdAsync(request.UserId.Value.ToString());
+                if (newUser == null)
                 {
                     return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User not found");
                 }
             }
 
-            task.Title = request.Title;
-            task.Description = request.Description;
-            task.Status = request.Status;
-            task.StartDate = request.StartDate;
-            task.EndDate = request.EndDate;
-            task.UserId = request.UserId;
-            task.UpdatedAt = DateTime.UtcNow;
-
-            // Cập nhật milestones (xóa các milestone hiện tại, gán milestones mới)
-            if (request.MilestoneIds != null)
+            User? newReviewer = null;
+            if (request.ReviewerId.HasValue)
             {
-                var milestones = await _milestoneRepository.GetMilestonesByIdsAsync(request.MilestoneIds);
-                if (milestones == null || milestones.Count() != request.MilestoneIds.Length || milestones.Any(m => m.IsDeleted))
+                newReviewer = await _userManager.FindByIdAsync(request.ReviewerId.Value.ToString());
+                if (newReviewer == null)
                 {
-                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Some milestones not found or have been deleted");
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Reviewer not found");
                 }
 
-                // Xóa các milestones cũ
-                task.Milestones.Clear();
-                // Thêm milestones mới
-                foreach (var milestone in milestones)
+                // Verify reviewer is a ProjectManager
+                var reviewerRoles = await _userManager.GetRolesAsync(newReviewer);
+                if (!reviewerRoles.Contains("ProjectManager"))
                 {
-                    _milestoneRepository.Attach(milestone);
-                    task.Milestones.Add(milestone);
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Reviewer must be a Project Manager");
                 }
             }
 
-            await _projectTaskRepository.UpdateAsync(task);
-            await _projectTaskRepository.SaveChangesAsync();
-
-            // Gửi notification nếu task được assign/reassign cho user khác
-            if (request.UserId.HasValue && request.UserId != oldUserId && user != null)
+            var strategy = _projectTaskRepository.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                string notificationTitle;
-                string notificationMessage;
-                string emailSubject;
-                string emailBody;
-
-                if (oldUserId.HasValue)
+                // Bắt đầu transaction
+                using var transaction = await _projectTaskRepository.BeginTransactionAsync();
+                try
                 {
-                    // Task được reassign từ user khác
-                    notificationTitle = "Công việc được giao lại";
-                    notificationMessage = $"Công việc '{task.Title}' đã được giao lại cho bạn trong dự án {project.Name}";
-                    emailSubject = "Công việc được giao lại";
-                    emailBody = $"Xin chào {user.FullName},<br/><br/>" +
-                               $"Công việc <strong>{task.Title}</strong> đã được giao lại cho bạn.<br/>" +
-                               $"Dự án: {project.Name}<br/>" +
-                               $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
-                               $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết.";
-                }
-                else
-                {
-                    // Task được assign lần đầu
-                    notificationTitle = "Công việc mới được giao";
-                    notificationMessage = $"Bạn đã được giao công việc: {task.Title} trong dự án {project.Name}";
-                    emailSubject = "Công việc mới được giao";
-                    emailBody = $"Xin chào {user.FullName},<br/><br/>" +
-                               $"Bạn đã được giao công việc mới: <strong>{task.Title}</strong><br/>" +
-                               $"Dự án: {project.Name}<br/>" +
-                               $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
-                               $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết.";
-                }
-
-                var notificationRequest = new CreateNotificationRequest
-                {
-                    UserId = request.UserId.Value,
-                    ActorId = request.ActorId,
-                    Title = notificationTitle,
-                    Message = notificationMessage,
-                    Type = NotificationTypeEnum.TaskAssignment.ToString(),
-                    EntityId = task.Id.ToString(),
-                    Data = System.Text.Json.JsonSerializer.Serialize(new
+                    // AUTO TRACK: Title change
+                    if (!string.IsNullOrEmpty(request.Title) && task.Title != request.Title)
                     {
-                        TaskId = task.Id,
-                        TaskTitle = task.Title,
-                        ProjectId = project.Id,
-                        ProjectName = project.Name,
-                        DueDate = task.EndDate,
-                        IsReassignment = oldUserId.HasValue
-                    })
-                };
+                        await _taskHistoryService.TrackFieldChangeAsync(
+                            task.Id,
+                            "Title",
+                            oldTitle,
+                            request.Title,
+                            request.ActorId);
+                        task.Title = request.Title;
+                    }
 
-                await _notificationService.CreateInAppNotificationAsync(notificationRequest);
-
-                // Gửi email notification (async via Hangfire)
-                _notificationService.SendEmailNotification(
-                    user.Email!,
-                    emailSubject,
-                    emailBody
-                );
-            }
-
-            if (request.UserId != null)
-            {
-                if (oldUserId != request.UserId)
-                {
-                    var newTaskHistory = new CreateTaskHistoryRequest
+                    // AUTO TRACK: Description change
+                    if (!string.IsNullOrEmpty(request.Description) && task.Description != request.Description)
                     {
-                        TaskId = request.Id,
-                        FromUserId = oldUserId,
-                        ToUserId = request.UserId.Value
-                    };
-                    await _taskHistoryService.CreateTaskHistoryAsync(newTaskHistory);
+                        await _taskHistoryService.TrackFieldChangeAsync(
+                            task.Id,
+                            "Description",
+                            oldDescription,
+                            request.Description,
+                            request.ActorId);
+                        task.Description = request.Description;
+                    }
+
+                    // AUTO TRACK: Status change
+                    if (!string.IsNullOrEmpty(request.Status) && task.Status != request.Status)
+                    {
+                        await _taskHistoryService.TrackStatusChangeAsync(
+                            task.Id,
+                            oldStatus,
+                            request.Status,
+                            request.ActorId);
+                        task.Status = request.Status;
+
+                        // Gửi notification cho reviewer khi status change to ReadyToReview
+                        if (request.Status == TaskEnum.ReadyToReview.ToString() && task.ReviewerId.HasValue)
+                        {
+                            var reviewer = task.Reviewer ?? await _userManager.FindByIdAsync(task.ReviewerId.Value.ToString());
+                            if (reviewer != null)
+                            {
+                                var reviewNotification = new CreateNotificationRequest
+                                {
+                                    UserId = task.ReviewerId.Value,
+                                    ActorId = request.ActorId,
+                                    Title = "Yêu cầu review công việc",
+                                    Message = $"{task.User?.FullName ?? "Một thành viên"} yêu cầu bạn review công việc '{task.Title}' trong dự án {project.Name}",
+                                    Type = NotificationTypeEnum.TaskUpdate.ToString(),
+                                    EntityId = task.Id.ToString(),
+                                    Data = System.Text.Json.JsonSerializer.Serialize(new
+                                    {
+                                        TaskId = task.Id,
+                                        TaskTitle = task.Title,
+                                        ProjectId = project.Id,
+                                        ProjectName = project.Name,
+                                        AssigneeId = task.UserId,
+                                        AssigneeName = task.User?.FullName,
+                                        Status = request.Status
+                                    })
+                                };
+
+                                await _notificationService.CreateInAppNotificationAsync(reviewNotification);
+
+                                _notificationService.SendEmailNotification(
+                                    reviewer.Email!,
+                                    "Yêu cầu review công việc",
+                                    $"Xin chào {reviewer.FullName},<br/><br/>" +
+                                    $"<strong>{task.User?.FullName ?? "Một thành viên"}</strong> đã hoàn thành và yêu cầu bạn review công việc sau:<br/><br/>" +
+                                    $"📋 <strong>Công việc:</strong> {task.Title}<br/>" +
+                                    $"📁 <strong>Dự án:</strong> {project.Name}<br/>" +
+                                    $"👤 <strong>Người thực hiện:</strong> {task.User?.FullName ?? "N/A"}<br/>" +
+                                    $"📅 <strong>Ngày hoàn thành:</strong> {DateTime.Now:dd/MM/yyyy HH:mm}<br/><br/>" +
+                                    $"Vui lòng truy cập hệ thống để kiểm tra và phản hồi."
+                                );
+                            }
+                        }
+                    }
+
+                    // AUTO TRACK: StartDate change
+                    if (request.StartDate.HasValue && task.StartDate != request.StartDate.Value)
+                    {
+                        await _taskHistoryService.TrackFieldChangeAsync(
+                            task.Id,
+                            "StartDate",
+                            oldStartDate?.ToString("dd/MM/yyyy"),
+                            request.StartDate.Value.ToString("dd/MM/yyyy"),
+                            request.ActorId);
+                        task.StartDate = request.StartDate.Value;
+                    }
+
+                    // AUTO TRACK: EndDate change
+                    if (request.EndDate.HasValue && task.EndDate != request.EndDate.Value)
+                    {
+                        await _taskHistoryService.TrackFieldChangeAsync(
+                            task.Id,
+                            "EndDate",
+                            oldEndDate?.ToString("dd/MM/yyyy"),
+                            request.EndDate.Value.ToString("dd/MM/yyyy"),
+                            request.ActorId);
+                        task.EndDate = request.EndDate.Value;
+
+                        var currentDate = DateTime.UtcNow.Date;
+                        if (request.EndDate.Value.Date > currentDate)
+                        {
+                            task.IsOverdue = false;
+                        }
+                        else if (request.EndDate.Value.Date < currentDate &&
+                                 task.Status != TaskEnum.Done.ToString() &&
+                                 task.Status != TaskEnum.Cancelled.ToString())
+                        {
+                            task.IsOverdue = true;
+                        }
+                    }
+
+                    // AUTO TRACK: Assignment/Reassignment
+                    if (request.UserId != oldUserId)
+                    {
+                        if (oldUserId.HasValue && request.UserId.HasValue)
+                        {
+                            // Reassignment
+                            await _taskHistoryService.TrackTaskAssignmentAsync(
+                                task.Id,
+                                oldUserId.Value,
+                                request.UserId.Value,
+                                request.ActorId);
+                        }
+                        else if (request.UserId.HasValue)
+                        {
+                            // First assignment
+                            await _taskHistoryService.TrackTaskAssignmentAsync(
+                                task.Id,
+                                null,
+                                request.UserId.Value,
+                                request.ActorId);
+                        }
+                        // Note: Không track khi unassign (UserId từ có → null)
+
+                        task.UserId = request.UserId;
+                    }
+
+                    // Handle Reviewer changes
+                    if (request.ReviewerId != oldReviewerId)
+                    {
+                        task.ReviewerId = request.ReviewerId;
+                    }
+
+                    task.UpdatedAt = DateTime.UtcNow;
+
+                    // Cập nhật milestones
+                    if (request.MilestoneIds != null)
+                    {
+                        var milestones = await _milestoneRepository.GetMilestonesByIdsAsync(request.MilestoneIds);
+                        if (milestones == null || milestones.Count() != request.MilestoneIds.Length || milestones.Any(m => m.IsDeleted))
+                        {
+                            await transaction.RollbackAsync();
+                            throw new Exception("Milestone invalid");
+                        }
+
+                        task.Milestones.Clear();
+                        foreach (var milestone in milestones)
+                        {
+                            _milestoneRepository.Attach(milestone);
+                            task.Milestones.Add(milestone);
+                        }
+                    }
+
+                    await _projectTaskRepository.UpdateAsync(task);
+                    await _projectTaskRepository.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    // Gửi notification nếu task được assign/reassign
+                    if (request.UserId.HasValue && request.UserId != oldUserId && newUser != null)
+                    {
+                        string notificationTitle;
+                        string notificationMessage;
+                        string emailSubject;
+                        string emailBody;
+
+                        if (oldUserId.HasValue)
+                        {
+                            notificationTitle = "Công việc được giao lại";
+                            notificationMessage = $"Công việc '{task.Title}' đã được giao lại cho bạn trong dự án {project.Name}";
+                            emailSubject = "Công việc được giao lại";
+                            emailBody = $"Xin chào {newUser.FullName},<br/><br/>" +
+                                       $"Công việc <strong>{task.Title}</strong> đã được giao lại cho bạn.<br/>" +
+                                       $"Dự án: {project.Name}<br/>" +
+                                       $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                                       $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết.";
+                        }
+                        else
+                        {
+                            notificationTitle = "Công việc mới được giao";
+                            notificationMessage = $"Bạn đã được giao công việc: {task.Title} trong dự án {project.Name}";
+                            emailSubject = "Công việc mới được giao";
+                            emailBody = $"Xin chào {newUser.FullName},<br/><br/>" +
+                                       $"Bạn đã được giao công việc mới: <strong>{task.Title}</strong><br/>" +
+                                       $"Dự án: {project.Name}<br/>" +
+                                       $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                                       $"Vui lòng kiểm tra bảng điều khiển để biết thêm chi tiết.";
+                        }
+
+                        var notificationRequest = new CreateNotificationRequest
+                        {
+                            UserId = request.UserId.Value,
+                            ActorId = request.ActorId,
+                            Title = notificationTitle,
+                            Message = notificationMessage,
+                            Type = NotificationTypeEnum.TaskAssignment.ToString(),
+                            EntityId = task.Id.ToString(),
+                            Data = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                TaskId = task.Id,
+                                TaskTitle = task.Title,
+                                ProjectId = project.Id,
+                                ProjectName = project.Name,
+                                DueDate = task.EndDate,
+                                IsReassignment = oldUserId.HasValue
+                            })
+                        };
+
+                        await _notificationService.CreateInAppNotificationAsync(notificationRequest);
+                        _notificationService.SendEmailNotification(newUser.Email!, emailSubject, emailBody);
+                    }
+
+                    // Gửi notification nếu reviewer changed
+                    if (request.ReviewerId.HasValue && request.ReviewerId != oldReviewerId && newReviewer != null)
+                    {
+                        var reviewerNotification = new CreateNotificationRequest
+                        {
+                            UserId = request.ReviewerId.Value,
+                            ActorId = request.ActorId,
+                            Title = "Bạn được yêu cầu review công việc",
+                            Message = $"Bạn được yêu cầu review cho công việc: {task.Title} trong dự án {project.Name}",
+                            Type = NotificationTypeEnum.TaskAssignment.ToString(),
+                            EntityId = task.Id.ToString(),
+                            Data = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                TaskId = task.Id,
+                                TaskTitle = task.Title,
+                                ProjectId = project.Id,
+                                ProjectName = project.Name,
+                                DueDate = task.EndDate,
+                                AssigneeId = task.UserId,
+                                AssigneeName = task.User?.FullName
+                            })
+                        };
+
+                        await _notificationService.CreateInAppNotificationAsync(reviewerNotification);
+
+                        _notificationService.SendEmailNotification(
+                            newReviewer.Email!,
+                            "Bạn được yêu cầu review công việc",
+                            $"Xin chào {newReviewer.FullName},<br/><br/>" +
+                            $"Bạn được yêu cầu review cho công việc: <strong>{task.Title}</strong><br/>" +
+                            $"Dự án: {project.Name}<br/>" +
+                            $"Người thực hiện: {task.User?.FullName ?? "Chưa có"}<br/>" +
+                            $"Hạn chót: {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                            $"Vui lòng theo dõi tiến độ và review công việc này."
+                        );
+                    }
                 }
-            }
-            
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
+
             var response = new GetTaskResponse
             {
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -491,6 +733,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {
@@ -522,11 +771,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -535,6 +786,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {
@@ -563,11 +821,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 Id = task.Id,
                 ProjectId = task.ProjectId,
                 UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
                 Title = task.Title,
                 Description = task.Description,
                 Status = task.Status,
                 StartDate = task.StartDate,
                 EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
                 CreatedAt = task.CreatedAt,
                 UpdatedAt = task.UpdatedAt,
                 User = task.User == null ? null : new GetUserResponse
@@ -576,6 +836,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     Email = task.User.Email,
                     FullName = task.User.FullName,
                     AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
                 },
                 Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
                 {

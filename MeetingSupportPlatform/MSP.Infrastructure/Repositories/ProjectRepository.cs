@@ -64,12 +64,12 @@ namespace MSP.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<Project>> GetScheduledProjectsToStartAsync(DateTime currentTime, string scheduledStatus)
+        public async Task<IEnumerable<Project>> GetNotStartedProjectsProjectsToStartAsync(DateTime currentTime, string notStartedStatus)
         {
             return await _context.Projects
                 .Where(p =>
                     !p.IsDeleted &&
-                    p.Status == scheduledStatus &&
+                    p.Status == notStartedStatus &&
                     p.StartDate.HasValue &&
                     p.StartDate.Value <= currentTime)
                 .ToListAsync();

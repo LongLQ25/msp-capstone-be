@@ -39,7 +39,8 @@ namespace MSP.Infrastructure.Extensions
             services.AddScoped<IPackageRepository, PackageRepository>();
             services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();  
             services.AddScoped<ILimitationRepository, LimitationRepository>();
-            
+            services.AddScoped<ICommentRepository, CommentRepository>();
+
             // Register Services
             services.AddScoped<IEmailSender, EmailSender>();
 
