@@ -50,9 +50,9 @@ namespace MSP.Application.Services.Implementations.Auth
                 FullName = registerRequest.FullName,
                 PhoneNumber = registerRequest.PhoneNumber,
                 SecurityStamp = Guid.NewGuid().ToString(),
-                EmailConfirmed = false, // Email not yet confirmed
+                EmailConfirmed = false, // Email chưa được xác thực
                 CreatedAt = DateTime.UtcNow,
-                IsApproved = role == UserRoleEnum.Member.ToString() // Member is approved immediately, BusinessOwner needs admin approval
+                IsApproved = role == UserRoleEnum.Member.ToString() // Member được approve ngay, BusinessOwner cần chờ admin
             };
 
             if (role == UserRoleEnum.BusinessOwner.ToString())
@@ -70,13 +70,13 @@ namespace MSP.Application.Services.Implementations.Auth
                 throw new RegistrationFailedException(result.Errors.Select(e => e.Description));
             }
             
-            // Add user to corresponding role
+            // Thêm user vào role tương ứng
             await _userManager.AddToRoleAsync(user, role);
 
             // Generate email confirmation token
             var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
-            // Send confirmation email via Hangfire
+            // Gửi email xác nhận bằng Hangfire
             var clientUrl = _configuration["AppSettings:ClientUrl"];
             var confirmationUrl = $"{clientUrl}/confirm-email?email={Uri.EscapeDataString(user.Email)}&token={Uri.EscapeDataString(confirmationToken)}";
             var emailBody = EmailNotificationTemplate.ConfirmMailNotification(user.FullName, confirmationUrl);
@@ -87,7 +87,7 @@ namespace MSP.Application.Services.Implementations.Auth
                 emailBody
             );
 
-            // Different messages depending on role
+            // Thông báo khác nhau tùy theo role
             var message = role == UserRoleEnum.Member.ToString() 
                 ? "User created successfully! Please check your email to confirm your account."
                 : "User created successfully! Please check your email to confirm your account. Your account will be reviewed by an admin before you can log in.";
@@ -107,7 +107,7 @@ namespace MSP.Application.Services.Implementations.Auth
                 return ApiResponse<LoginResponse>.ErrorResponse(null, "Please verify and confirm your email before logging in.");
             }
             
-            // Check approval status for BusinessOwner
+            // Kiểm tra trạng thái approval cho BusinessOwner
             var roles = (await _userManager.GetRolesAsync(user)).ToArray();
             if (roles.Contains(UserRoleEnum.BusinessOwner.ToString()) && !user.IsApproved)
             {
@@ -205,7 +205,7 @@ namespace MSP.Application.Services.Implementations.Auth
                 SecurityStamp = Guid.NewGuid().ToString(),
                 EmailConfirmed = true, // Google accounts are pre-verified
                 CreatedAt = DateTime.UtcNow,
-                IsApproved = true, // Member is approved immediately
+                IsApproved = true, // Member được approve ngay
                 IsActive = true
             };
 
@@ -217,11 +217,11 @@ namespace MSP.Application.Services.Implementations.Auth
                 return ApiResponse<LoginResponse>.ErrorResponse(null, "Unable to create user account.", errors);
             }
 
-            // Add user to Member role
+            // Thêm user vào role Member
             var addRoleResult = await _userManager.AddToRoleAsync(newUser, UserRoleEnum.Member.ToString());
             if (!addRoleResult.Succeeded)
             {
-                // Rollback: delete created user if role assignment fails
+                // Rollback: xóa user đã tạo nếu không thêm được role
                 await _userManager.DeleteAsync(newUser);
                 var errors = addRoleResult.Errors.Select(e => e.Description);
                 return ApiResponse<LoginResponse>.ErrorResponse(null, "Unable to assign role to user.", errors);
@@ -240,7 +240,7 @@ namespace MSP.Application.Services.Implementations.Auth
             _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("ACCESS_TOKEN", jwtToken, expiresAtUtc);
             _authTokenProcessor.WriteAuthTokenAsHttpOnlyCookie("REFRESH_TOKEN", refreshToken, refreshTokenExpiry);
 
-            // Create in-app notification to welcome new user
+            // Tạo notification in-app chào mừng user mới
             try
             {
                 await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
@@ -254,8 +254,8 @@ namespace MSP.Application.Services.Implementations.Auth
             }
             catch (Exception)
             {
-                // Log error but don't fail request as notification is not critical
-                // Notification failure does not affect registration flow
+                // Log error nhưng không fail request vì notification không critical
+                // Notification failure không ảnh hưởng đến flow đăng ký
             }
 
             var response = new LoginResponse
@@ -318,7 +318,7 @@ namespace MSP.Application.Services.Implementations.Auth
                 return ApiResponse<string>.ErrorResponse(null, "Invalid confirmation token.");
             }
 
-            // Create in-app notification and save to DB
+            // Tạo notification in-app lưu vào DB
             await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
             {
                 UserId = user.Id,
