@@ -245,6 +245,7 @@ namespace MSP.Application.Services.Implementations.SubscriptionService
                 }
             };
             return ApiResponse<GetSubscriptionUsageResponse>.SuccessResponse(response, "Get active subscription with usage successfully");
+        }
 
         public async Task<ApiResponse<IEnumerable<GetSubscriptionDetailResponse>>> GetAllSubscriptionsAsync()
         {

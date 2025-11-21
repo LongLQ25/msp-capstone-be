@@ -119,8 +119,8 @@ namespace MSP.Application.Services.Implementations.Users
             await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
             {
                 UserId = user.Id,
-                Title = "Tài khoản đã được duyệt",
-                Message = $"Chào mừng {user.FullName}! Tài khoản BusinessOwner của bạn đã được admin duyệt. Bạn có thể đăng nhập vào hệ thống.",
+                Title = "Account approved",
+                Message = $"Welcome {user.FullName}! Your BusinessOwner account has been approved by admin. You can now log in to the system.",
                 Type = MSP.Shared.Enums.NotificationTypeEnum.InApp.ToString(),
                 Data = $"{{\"eventType\":\"AccountApproved\",\"userId\":\"{user.Id}\"}}"
             });
@@ -131,7 +131,7 @@ namespace MSP.Application.Services.Implementations.Users
 
             _notificationService.SendEmailNotification(
                 user.Email,
-                "Tài khoản BusinessOwner đã được duyệt - Meeting Support Platform",
+                "BusinessOwner Account Approved - Meeting Support Platform",
                 emailBody
             );
 
@@ -157,7 +157,7 @@ namespace MSP.Application.Services.Implementations.Users
                 await _subscriptionRepository.SaveChangesAsync();
             }
 
-            return ApiResponse<string>.SuccessResponse("BusinessOwner approved successfully!", "Chấp nhận người dùng làm BusinessOwner thành công.");
+            return ApiResponse<string>.SuccessResponse("BusinessOwner approved successfully!", "User has been approved as BusinessOwner successfully.");
         }
 
         public async Task<ApiResponse<string>> RejectBusinessOwnerAsync(Guid userId)
@@ -183,8 +183,8 @@ namespace MSP.Application.Services.Implementations.Users
             await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
             {
                 UserId = user.Id,
-                Title = "Tài khoản bị từ chối",
-                Message = $"Xin chào {user.FullName}, tài khoản BusinessOwner của bạn đã bị từ chối. Vui lòng liên hệ admin để biết thêm chi tiết.",
+                Title = "Account rejected",
+                Message = $"Hello {user.FullName}, your BusinessOwner account has been rejected. Please contact admin for more details.",
                 Type = MSP.Shared.Enums.NotificationTypeEnum.InApp.ToString(),
                 Data = $"{{\"eventType\":\"AccountRejected\",\"userId\":\"{user.Id}\"}}"
             });
@@ -195,11 +195,11 @@ namespace MSP.Application.Services.Implementations.Users
 
             _notificationService.SendEmailNotification(
                 user.Email,
-                "Yêu cầu BusinessOwner không được chấp nhận - Meeting Support Platform",
+                "BusinessOwner Request Not Approved - Meeting Support Platform",
                 emailBody
             );
 
-            return ApiResponse<string>.SuccessResponse("BusinessOwner rejected successfully!", "Từ chối người dùng làm BusinessOwner thành công.");
+            return ApiResponse<string>.SuccessResponse("BusinessOwner rejected successfully!", "User BusinessOwner request has been rejected successfully.");
         }
 
         public async Task<ApiResponse<string>> ToggleUserActiveStatusAsync(Guid userId)
@@ -219,9 +219,9 @@ namespace MSP.Application.Services.Implementations.Users
             }
 
             var status = user.IsActive ? "activated" : "deactivated";
-            var vnStatus = user.IsActive ? "Kích hoạt người dùng thành công." : "Vô hiệu hóa người dùng thành công.";
+            var statusMessage = user.IsActive ? "User activated successfully." : "User deactivated successfully.";
 
-            return ApiResponse<string>.SuccessResponse($"User {status} successfully!", vnStatus);
+            return ApiResponse<string>.SuccessResponse($"User {status} successfully!", statusMessage);
         }
 
         public async Task<ApiResponse<IEnumerable<GetUserResponse>>> GetMembersManagedByAsync(Guid businessOwnerId)
