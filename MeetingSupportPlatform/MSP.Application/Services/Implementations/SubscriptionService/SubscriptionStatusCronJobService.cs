@@ -40,7 +40,9 @@ namespace MSP.Application.Services.Implementations.SubscriptionService
                             subscription.UserId,
                             subscription.EndDate);
                     }
+                    await _subscriptionRepository.SaveChangesAsync();
                 }
+
                 else
                 {
                     _logger.LogInformation("No subscriptions to expire today.");
