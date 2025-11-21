@@ -33,7 +33,16 @@ namespace MSP.WebAPI.Controllers
 
             return Ok(response);
         }
+        [HttpGet("active/{userId}/usage")]
+        public async Task<IActionResult> GetActiveSubscriptionWithUsage(Guid userId)
+        {
+            var response = await _subscriptionService.GetActiveSubscriptionWithUsageAsync(userId);
 
+            if (!response.Success)
+                return NotFound(response);
+
+            return Ok(response);
+        }
 
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetSubscriptionsByUser(Guid userId)

@@ -14,6 +14,6 @@ namespace MSP.Application.Services.Interfaces.Subscription
         Task<ApiResponse<GetSubscriptionResponse>> CreateSubscriptionAsync(CreateSubscriptionRequest request);
         Task<ApiResponse<IEnumerable<GetSubscriptionDetailResponse>>> GetSubscriptionsByUserIdAsync(Guid userId);
         Task<ApiResponse<GetSubscriptionDetailResponse>> GetActiveSubscriptionByUserIdAsync(Guid userId);
-
+        Task<ApiResponse<GetSubscriptionUsageResponse>> GetActiveSubscriptionWithUsageAsync(Guid userId);
     }
 }
