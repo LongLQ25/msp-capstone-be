@@ -1,5 +1,6 @@
 ﻿using Hangfire;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using MSP.Application.Abstracts;
 using MSP.Application.Exceptions;
 using MSP.Application.Models.Requests.Auth;
@@ -20,13 +21,14 @@ namespace MSP.Application.Services.Implementations.Auth
         private readonly UserManager<User> _userManager;
         private readonly IUserRepository _userRepository;
         private readonly INotificationService _notificationService;
-
-        public AccountService(IAuthTokenProcessor authTokenProcessor, UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService)
+        private readonly IConfiguration _configuration;
+        public AccountService(IAuthTokenProcessor authTokenProcessor, UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService, IConfiguration configuration)
         {
             _authTokenProcessor = authTokenProcessor;
             _userManager = userManager;
             _userRepository = userRepository;
             _notificationService = notificationService;
+            _configuration = configuration;
         }
         public async Task<ApiResponse<string>> RegisterAsync(RegisterRequest registerRequest)
         {
@@ -75,7 +77,8 @@ namespace MSP.Application.Services.Implementations.Auth
             var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
             // Gửi email xác nhận bằng Hangfire
-            var confirmationUrl = $"http://localhost:3000/confirm-email?email={Uri.EscapeDataString(user.Email)}&token={Uri.EscapeDataString(confirmationToken)}";
+            var clientUrl = _configuration["AppSettings:ClientUrl"];
+            var confirmationUrl = $"{clientUrl}/confirm-email?email={Uri.EscapeDataString(user.Email)}&token={Uri.EscapeDataString(confirmationToken)}";
             var emailBody = EmailNotificationTemplate.ConfirmMailNotification(user.FullName, confirmationUrl);
 
             _notificationService.SendEmailNotification(

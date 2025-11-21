@@ -22,7 +22,9 @@ namespace MSP.Application.Services.Implementations.Users
         private readonly IOrganizationInviteRepository _organizationInviteRepository;
         private readonly IProjectMemberRepository _projectMemberRepository;
         private readonly IProjectRepository _projectRepository;
-        public UserService(UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService, IOrganizationInviteRepository organizationInviteRepository, IProjectMemberRepository projectMemberRepository, IProjectRepository projectRepository)
+        private readonly ISubscriptionRepository _subscriptionRepository;
+        private readonly IPackageRepository _packageRepository;
+        public UserService(UserManager<User> userManager, IUserRepository userRepository, INotificationService notificationService, IOrganizationInviteRepository organizationInviteRepository, IProjectMemberRepository projectMemberRepository, IProjectRepository projectRepository, ISubscriptionRepository subscriptionRepository, IPackageRepository packageRepository)
         {
             _userManager = userManager;
             _userRepository = userRepository;
@@ -30,6 +32,8 @@ namespace MSP.Application.Services.Implementations.Users
             _organizationInviteRepository = organizationInviteRepository;
             _projectMemberRepository = projectMemberRepository;
             _projectRepository = projectRepository;
+            _subscriptionRepository = subscriptionRepository;
+            _packageRepository = packageRepository;
         }
 
         public async Task<ApiResponse<IEnumerable<UserResponse>>> GetBusinessOwnersAsync()
@@ -130,6 +134,28 @@ namespace MSP.Application.Services.Implementations.Users
                 "Tài khoản BusinessOwner đã được duyệt - Meeting Support Platform",
                 emailBody
             );
+
+
+            // Add free subscription package
+            var freePackage = await _packageRepository.GetFreePackageAsync();
+            if (freePackage != null)
+            {
+                var subscription = new Subscription
+                {
+                    UserId = user.Id,
+                    PackageId = freePackage.Id,
+                    TotalPrice = 0,
+                    TransactionID = "FREE_PACKAGE",
+                    PaymentMethod = "System",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Status = PaymentEnum.Paid.ToString().ToUpper(),
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(freePackage.BillingCycle),
+                };
+                await _subscriptionRepository.AddAsync(subscription);
+                await _subscriptionRepository.SaveChangesAsync();
+            }
 
             return ApiResponse<string>.SuccessResponse("BusinessOwner approved successfully!", "Chấp nhận người dùng làm BusinessOwner thành công.");
         }
