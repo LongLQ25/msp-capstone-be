@@ -17,5 +17,7 @@ namespace MSP.Application.Repositories
 
         Task<Subscription?> GetActiveSubscriptionByUserIdAsync(Guid userId);
         Task<IEnumerable<Subscription>> GetExpiredTodayAsync();
+        Task<Subscription?> GetFreeSubscriptionByUserAsync(Guid userId);
+
     }
 }

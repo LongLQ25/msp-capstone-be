@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using MSP.Application.Repositories;
 using System;
 using System.Collections.Generic;
@@ -31,6 +31,7 @@ namespace MSP.Application.Services.Implementations.SubscriptionService
                     _logger.LogInformation("Found {Count} subscriptions to expire", expiredSubscriptions.Count());
                     foreach (var subscription in expiredSubscriptions)
                     {
+                        // Expire the subscription
                         subscription.IsActive = false;
                         subscription.UpdatedAt = DateTime.UtcNow;
                         await _subscriptionRepository.UpdateAsync(subscription);
@@ -39,10 +40,21 @@ namespace MSP.Application.Services.Implementations.SubscriptionService
                             subscription.Id,
                             subscription.UserId,
                             subscription.EndDate);
+                        // Active free subscription
+                        var freeSubscription = await _subscriptionRepository.GetFreeSubscriptionByUserAsync(subscription.UserId);
+                        if (freeSubscription != null)
+                        {
+                            freeSubscription.IsActive = true;
+                            freeSubscription.UpdatedAt = DateTime.UtcNow;
+                            await _subscriptionRepository.UpdateAsync(freeSubscription);
+                            _logger.LogInformation(
+                                "Activated free subscription {SubscriptionId} for User {UserId}.",
+                                freeSubscription.Id,
+                                freeSubscription.UserId);
+                        }
                     }
                     await _subscriptionRepository.SaveChangesAsync();
                 }
-
                 else
                 {
                     _logger.LogInformation("No subscriptions to expire today.");
