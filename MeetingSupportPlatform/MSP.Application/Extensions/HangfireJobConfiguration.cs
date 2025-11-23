@@ -1,9 +1,9 @@
 using Hangfire;
 using Microsoft.AspNetCore.Builder;
-using MSP.Application.Services.Implementations.ProjectTask;
-using MSP.Application.Services.Implementations.Meeting;
 using MSP.Application.Services.Implementations.Cleanup;
+using MSP.Application.Services.Implementations.Meeting;
 using MSP.Application.Services.Implementations.Project;
+using MSP.Application.Services.Implementations.ProjectTask;
 using MSP.Application.Services.Implementations.SubscriptionService;
 
 namespace MSP.Application.Extensions
