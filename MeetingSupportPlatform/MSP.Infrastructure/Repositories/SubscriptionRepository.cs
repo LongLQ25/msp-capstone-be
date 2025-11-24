@@ -68,7 +68,5 @@ namespace MSP.Infrastructure.Repositories
                 .Where(x => x.UserId == userId && x.TotalPrice == 0)
                 .FirstOrDefaultAsync();
         }
-       
-
     }
 }
