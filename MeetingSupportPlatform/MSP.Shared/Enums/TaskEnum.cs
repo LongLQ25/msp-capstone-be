@@ -2,7 +2,7 @@
 {
     public enum TaskEnum
     {
-        NotStarted,
+        Todo,
         InProgress,
         ReadyToReview,
         ReOpened,

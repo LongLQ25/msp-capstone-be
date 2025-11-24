@@ -68,17 +68,7 @@ namespace MSP.Infrastructure.Repositories
                 .Where(x => x.UserId == userId && x.TotalPrice == 0)
                 .FirstOrDefaultAsync();
         }
-        
-        public async Task<IEnumerable<Subscription>> GetExpiredTodayAsync()
-        {
-            var today = DateTime.UtcNow.Date;
-
-            return await _context.Subscriptions
-                .Where(s => s.EndDate.HasValue
-                            && s.EndDate.Value.Date == today
-                            && s.IsActive)
-                .ToListAsync();
-        }
+       
 
     }
 }

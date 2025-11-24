@@ -60,7 +60,7 @@ namespace MSP.Application.Services.Implementations.Todos
                     UserId = todo.UserId.Value,
                     TodoId = todo.Id,
                     ProjectId = todo.Meeting.ProjectId,
-                    Status = Shared.Enums.TaskEnum.NotStarted.ToString(),
+                    Status = Shared.Enums.TaskEnum.Todo.ToString(),
                     CreatedAt = DateTime.UtcNow
                 };
 
