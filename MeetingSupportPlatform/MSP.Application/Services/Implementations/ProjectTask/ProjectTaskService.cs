@@ -9,6 +9,7 @@ using MSP.Application.Services.Interfaces.ProjectTask;
 using MSP.Application.Services.Interfaces.Notification;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Services.Interfaces.TaskHistory;
+using MSP.Application.Validators;
 using MSP.Domain.Entities;
 using MSP.Shared.Common;
 using MSP.Shared.Enums;
@@ -44,6 +45,19 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Project not found");
             }
 
+            // Validate dates
+            var dateValidation = TaskValidator.ValidateTaskDates(
+                request.StartDate,
+                request.EndDate,
+                project.StartDate,
+                project.EndDate,
+                DateTime.UtcNow);
+
+            if (!dateValidation.isValid)
+            {
+                return ApiResponse<GetTaskResponse>.ErrorResponse(null, dateValidation.errorMessage);
+            }
+
             User? user = null;
             if (request.UserId.HasValue)
             {
@@ -57,7 +71,7 @@ namespace MSP.Application.Services.Implementations.ProjectTask
             var newTask = new Domain.Entities.ProjectTask
             {
                 ProjectId = request.ProjectId,
-                UserId = request.UserId,  // UserId nullable, có thể là null
+                UserId = request.UserId,
                 ReviewerId = null,
                 Title = request.Title,
                 Description = request.Description,
@@ -403,6 +417,53 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Project not found or has been deleted");
             }
 
+            // Get actor's role for permission check
+            var actor = await _userManager.FindByIdAsync(request.ActorId.ToString());
+            if (actor == null)
+            {
+                return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Actor not found");
+            }
+            var actorRoles = await _userManager.GetRolesAsync(actor);
+            var actorRole = actorRoles.FirstOrDefault() ?? "";
+
+            // Validate status transition
+            if (!string.IsNullOrEmpty(request.Status) && task.Status != request.Status)
+            {
+                if (!TaskValidator.IsValidStatusTransition(task.Status, request.Status))
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(
+                        null,
+                        TaskValidator.GetStatusTransitionError(task.Status, request.Status));
+                }
+            }
+
+            // Validate assignee change permission (only PM can change)
+            if (request.UserId != task.UserId)
+            {
+                if (!TaskValidator.CanChangeAssignee(actorRole))
+                {
+                    return ApiResponse<GetTaskResponse>.ErrorResponse(
+                        null,
+                        TaskValidator.GetAssigneeChangeError());
+                }
+            }
+
+            // Validate dates if changed
+            var newStartDate = request.StartDate ?? task.StartDate;
+            var newEndDate = request.EndDate ?? task.EndDate;
+
+            var dateValidation = TaskValidator.ValidateTaskDates(
+                newStartDate,
+                newEndDate,
+                project.StartDate,
+                project.EndDate,
+                DateTime.UtcNow);
+
+            if (!dateValidation.isValid)
+            {
+                return ApiResponse<GetTaskResponse>.ErrorResponse(null, dateValidation.errorMessage);
+            }
+
             // Lưu giá trị cũ để track changes
             var oldTitle = task.Title;
             var oldDescription = task.Description;
@@ -431,7 +492,6 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                     return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Reviewer not found");
                 }
 
-                // Verify reviewer is a ProjectManager
                 var reviewerRoles = await _userManager.GetRolesAsync(newReviewer);
                 if (!reviewerRoles.Contains("ProjectManager"))
                 {
