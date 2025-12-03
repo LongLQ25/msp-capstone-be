@@ -137,5 +137,20 @@ namespace MSP.Infrastructure.Repositories
                     (!endDate.HasValue || (x.RespondedAt.HasValue && x.RespondedAt.Value.Date <= endDate.Value.Date)))
                 .CountAsync();
         }
+
+        public async Task<bool> IsExternalInvitationExistsAsync(Guid businessOwnerId, string email)
+        {
+            return await _context.OrganizationInvitations
+                .AnyAsync(x => x.BusinessOwnerId == businessOwnerId
+                    && x.InvitedEmail == email.ToLower()
+                    && x.Status == InvitationStatus.Pending);
+        }
+
+        public async Task<OrganizationInvitation?> GetByTokenAsync(string token)
+        {
+            return await _context.OrganizationInvitations
+                .Include(x => x.BusinessOwner)
+                .FirstOrDefaultAsync(x => x.Token == token);
+        }
     }
 }

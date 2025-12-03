@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.Configuration;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Models.Responses.OrganizationInvitation;
 using MSP.Application.Repositories;
@@ -23,17 +24,21 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
         private readonly IProjectMemberRepository _projectMemberRepository;
         private readonly INotificationService _notificationService;
         private readonly UserManager<User> _userManager;
+        private readonly IConfiguration _configuration;
+
 
         public OrganizationInvitationService(
             IOrganizationInviteRepository organizationInviteRepository,
             UserManager<User> userManager,
             IProjectMemberRepository projectMemberRepository,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IConfiguration configuration)
         {
             _organizationInviteRepository = organizationInviteRepository;
             _userManager = userManager;
             _projectMemberRepository = projectMemberRepository;
             _notificationService = notificationService;
+            _configuration = configuration;
         }
 
         public async Task<ApiResponse<string>> BusinessOwnerAcceptRequestAsync(Guid businessOwnerId, Guid invitationId)
@@ -238,7 +243,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                     BusinessOwnerEmail = x.BusinessOwner?.Email,
                     BusinessOwnerAvatar = x.BusinessOwner?.AvatarUrl,
                     OrganizationName = x.BusinessOwner?.Organization,
-                    MemberId = x.MemberId,
+                    MemberId = x.MemberId.Value,
                     MemberName = x.Member?.FullName,
                     MemberEmail = x.Member?.Email,
                     MemberAvatar = x.Member?.AvatarUrl,
@@ -273,7 +278,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                     BusinessOwnerEmail = x.BusinessOwner?.Email,
                     BusinessOwnerAvatar = x.BusinessOwner?.AvatarUrl,
                     OrganizationName = x.BusinessOwner?.Organization,
-                    MemberId = x.MemberId,
+                    MemberId = x.MemberId.Value,
                     MemberName = x.Member?.FullName,
                     MemberEmail = x.Member?.Email,
                     MemberAvatar = x.Member?.AvatarUrl,
@@ -308,9 +313,9 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                     BusinessOwnerEmail = x.BusinessOwner?.Email,
                     BusinessOwnerAvatar = x.BusinessOwner?.AvatarUrl,
                     OrganizationName = x.BusinessOwner?.Organization,
-                    MemberId = x.MemberId,
-                    MemberName = x.Member?.FullName,
-                    MemberEmail = x.Member?.Email,
+                    MemberId = x.MemberId ?? Guid.Empty,
+                    MemberName = x.Member?.FullName ?? x.InvitedEmail,
+                    MemberEmail = x.Member?.Email ?? x.InvitedEmail,
                     MemberAvatar = x.Member?.AvatarUrl,
                     Type = x.Type,
                     Status = x.Status,
@@ -343,7 +348,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                     BusinessOwnerEmail = x.BusinessOwner?.Email,
                     BusinessOwnerAvatar = x.BusinessOwner?.AvatarUrl,
                     OrganizationName = x.BusinessOwner?.Organization,
-                    MemberId = x.MemberId,
+                    MemberId = x.MemberId.Value,
                     MemberName = x.Member?.FullName,
                     MemberEmail = x.Member?.Email,
                     MemberAvatar = x.Member?.AvatarUrl,
@@ -611,7 +616,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             {
                 return ApiResponse<bool>.ErrorResponse(false, "Business owner not found.");
             }
-            
+
             //Check businessOwner role
             var roles = await _userManager.GetRolesAsync(businessOwner);
             if (!roles.Contains("BusinessOwner"))
@@ -625,7 +630,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             {
                 return ApiResponse<bool>.ErrorResponse(false, "An invitation already exists.");
             }
-            
+
             // Create new invitation
             var invitation = new Domain.Entities.OrganizationInvitation
             {
@@ -690,7 +695,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             {
                 return ApiResponse<bool>.ErrorResponse(false, "Business owner not found.");
             }
-            
+
             // Verify businessOwner has BusinessOwner role
             var roles = await _userManager.GetRolesAsync(businessOwner);
             if (!roles.Contains(UserRoleEnum.BusinessOwner.ToString()))
@@ -698,7 +703,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                 return ApiResponse<bool>.ErrorResponse(false,
                     "You must be a business owner to send invitations.");
             }
-            
+
             // Validate business owner has organization
             if (string.IsNullOrEmpty(businessOwner.Organization))
             {
@@ -708,98 +713,102 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
 
             // Find member by email
             var member = await _userManager.FindByEmailAsync(memberEmail.ToUpper());
-            if (member == null)
-            {
-                return ApiResponse<bool>.ErrorResponse(false,
-                    $"No user found with email: {memberEmail}");
-            }
-            
-            // Verify member has Member role
-            var memberRoles = await _userManager.GetRolesAsync(member);
-            if (!memberRoles.Contains(UserRoleEnum.Member.ToString()))
-            {
-                return ApiResponse<bool>.ErrorResponse(false,
-                    "The specified user is not a member.");
-            }
-
-            // Check if member already has organization
-            if (!string.IsNullOrEmpty(member.Organization))
-            {
-                if (member.ManagedById == businessOwnerId)
-                {
-                    return ApiResponse<bool>.ErrorResponse(false,
-                        "This user is already part of your organization.");
-                }
-                else
-                {
-                    return ApiResponse<bool>.ErrorResponse(false,
-                        "This user is already part of another organization.");
-                }
-            }
 
             // Check for existing pending invitation
-            var existingInvitation = await _organizationInviteRepository.IsInvitationExistsAsync(businessOwnerId, member.Id);
-
+            //var existingInvitation = await _organizationInviteRepository.IsInvitationExistsAsync(businessOwnerId, member.Id);
+            var existingInvitation = member != null
+                ? await _organizationInviteRepository.IsInvitationExistsAsync(businessOwnerId, member.Id)
+                : await _organizationInviteRepository.IsExternalInvitationExistsAsync(businessOwnerId, memberEmail);
             if (existingInvitation)
+                return ApiResponse<bool>.ErrorResponse(false, "You already have a pending invitation for this user.");
+
+            // === MEMBER EXISTS - Internal flow ===
+            if (member != null)
             {
-                return ApiResponse<bool>.ErrorResponse(false,
-                    "You already have a pending invitation for this user.");
+                var memberRoles = await _userManager.GetRolesAsync(member);
+                if (!memberRoles.Contains(UserRoleEnum.Member.ToString()))
+                    return ApiResponse<bool>.ErrorResponse(false, "The specified user is not a member.");
+
+                if (!string.IsNullOrEmpty(member.Organization))
+                {
+                    return member.ManagedById == businessOwnerId
+                        ? ApiResponse<bool>.ErrorResponse(false, "This user is already part of your organization.")
+                        : ApiResponse<bool>.ErrorResponse(false, "This user is already part of another organization.");
+                }
+
+                // Create internal invitation
+                var internalInvitation = new Domain.Entities.OrganizationInvitation
+                {
+                    BusinessOwnerId = businessOwnerId,
+                    MemberId = member.Id,
+                    Type = InvitationType.Invite,
+                    Status = InvitationStatus.Pending,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var result = await _organizationInviteRepository.AddAsync(internalInvitation);
+                if (!result)
+                    return ApiResponse<bool>.ErrorResponse(false, "Failed to send invitation.");
+                // Send notification to member
+                try
+                {
+                    var notificationRequest = new CreateNotificationRequest
+                    {
+                        UserId = member.Id,
+                        ActorId = businessOwner.Id,
+                        Title = "Organization Invitation",
+                        Message = $"{businessOwner.FullName} has invited you to join the organization {businessOwner.Organization}.",
+                        Type = NotificationTypeEnum.InApp.ToString(),
+                        EntityId = internalInvitation.Id.ToString(),
+                        Data = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            InvitationId = internalInvitation.Id,
+                            OrganizationName = businessOwner.Organization,
+                            BusinessOwnerName = businessOwner.FullName,
+                            BusinessOwnerEmail = businessOwner.Email,
+                            BusinessOwnerId = businessOwner.Id,
+                            EventType = "OrganizationInvitation"
+                        })
+                    };
+
+                    await _notificationService.CreateInAppNotificationAsync(notificationRequest);
+
+                    // Send email notification
+                    _notificationService.SendEmailNotification(
+                        member.Email!,
+                        "Organization Invitation",
+                        $"Hello {member.FullName},<br/><br/>" +
+                        $"You have been invited to join the organization <strong>{businessOwner.Organization}</strong> by <strong>{businessOwner.FullName}</strong>.<br/><br/>" +
+                        $"Please log in to your dashboard to accept or decline the invitation.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to send notification: {ex.Message}");
+                }
+                return ApiResponse<bool>.SuccessResponse(true, "Invitation sent successfully.");
             }
 
-            // Create new invitation
-            var invitation = new Domain.Entities.OrganizationInvitation
+            // === MEMBER NOT EXISTS - External flow ===
+            var token = GenerateSecureToken();
+            var externalInvitation = new Domain.Entities.OrganizationInvitation
             {
                 BusinessOwnerId = businessOwnerId,
-                MemberId = member.Id,
+                MemberId = null,
+                InvitedEmail = memberEmail.ToLower(),
+                Token = token,
+                //ExpiresAt = DateTime.UtcNow.AddDays(7),
                 CreatedAt = DateTime.UtcNow,
-                Status = InvitationStatus.Pending,
-                Type = InvitationType.Invite
+                Type = InvitationType.Invite,
+                Status = InvitationStatus.Pending
             };
-
-            var result = await _organizationInviteRepository.AddAsync(invitation);
-            if (!result)
-            {
+            var addResult = await _organizationInviteRepository.AddAsync(externalInvitation);
+            if (!addResult)
                 return ApiResponse<bool>.ErrorResponse(false, "Failed to send invitation.");
-            }
 
-            // Send notification to member
-            try
-            {
-                var notificationRequest = new CreateNotificationRequest
-                {
-                    UserId = member.Id,
-                    ActorId = businessOwner.Id,
-                    Title = "Organization Invitation",
-                    Message = $"{businessOwner.FullName} has invited you to join the organization {businessOwner.Organization}.",
-                    Type = NotificationTypeEnum.InApp.ToString(),
-                    EntityId = invitation.Id.ToString(),
-                    Data = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        InvitationId = invitation.Id,
-                        OrganizationName = businessOwner.Organization,
-                        BusinessOwnerName = businessOwner.FullName,
-                        BusinessOwnerEmail = businessOwner.Email,
-                        BusinessOwnerId = businessOwner.Id,
-                        EventType = "OrganizationInvitation"
-                    })
-                };
+            // Send email với invitation link
+            await SendExternalInvitationEmailAsync(businessOwner, memberEmail, token);
 
-                await _notificationService.CreateInAppNotificationAsync(notificationRequest);
-
-                // Send email notification
-                _notificationService.SendEmailNotification(
-                    member.Email!,
-                    "Organization Invitation",
-                    $"Hello {member.FullName},<br/><br/>" +
-                    $"You have been invited to join the organization <strong>{businessOwner.Organization}</strong> by <strong>{businessOwner.FullName}</strong>.<br/><br/>" +
-                    $"Please log in to your dashboard to accept or decline the invitation.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to send notification: {ex.Message}");
-            }
-
-            return ApiResponse<bool>.SuccessResponse(true, "Invitation sent successfully.");
+            return ApiResponse<bool>.SuccessResponse(true,
+                "Invitation email sent. The user will receive instructions to join.");
         }
 
         public async Task<ApiResponse<List<SendInvitationResult>>> SendInvitationListAsync(Guid businessOwnerId, List<string> memberEmails)
@@ -819,6 +828,46 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                 results,
                 "Invitations processed."
             );
+        }
+
+        private string GenerateSecureToken()
+        {
+            var randomBytes = new byte[32];
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+            return Convert.ToBase64String(randomBytes)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .Replace("=", "");
+        }
+
+        private async Task SendExternalInvitationEmailAsync(User businessOwner, string email, string token)
+        {
+            //var invitationLink = $"{_configuration["AppSettings:ClientUrl"];}/invite/accept?token={token}";
+            var clientUrl = _configuration["AppSettings:ClientUrl"];
+            var invitationLink = $"{clientUrl}/invite/accept?token={token}";
+
+            var body = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+            <h2 style='color: #FF5E13;'>You've been invited!</h2>
+            <p><strong>{businessOwner.FullName}</strong> has invited you to join the organization 
+               <strong>{businessOwner.Organization}</strong>.</p>
+            <p>Click the button below to accept and create your account:</p>
+            <p style='margin: 24px 0;'>
+                <a href='{invitationLink}' 
+                   style='background-color: #FF5E13; color: white; padding: 14px 28px; 
+                          text-decoration: none; border-radius: 8px; display: inline-block;
+                          font-weight: bold;'>
+                    Accept Invitation
+                </a>
+            </p>
+            <p style='color: #666; font-size: 14px;'>This invitation will expire in 7 days.</p>
+            <p style='color: #999; font-size: 12px;'>
+                If you didn't expect this invitation, you can safely ignore this email.
+            </p>
+        </div>";
+
+            _notificationService.SendEmailNotification(email, $"Invitation to join {businessOwner.Organization}", body);
         }
     }
 }

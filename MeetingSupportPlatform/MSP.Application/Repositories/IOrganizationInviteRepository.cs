@@ -26,5 +26,8 @@ namespace MSP.Application.Repositories
 
         //count number of members in organization in subscription period
         Task<int> CountMembersInOrganizationAsync(Guid businessOwnerId, DateTime? startDate, DateTime? endDate);
+
+        Task<bool> IsExternalInvitationExistsAsync(Guid businessOwnerId, string email);
+        Task<OrganizationInvitation?> GetByTokenAsync(string token);
     }
 }

@@ -258,7 +258,12 @@ namespace MSP.Infrastructure.Persistence.DBContext
                 entity.HasOne(e => e.Member)
                     .WithMany(u => u.OrganizationInvitationsAsMember)
                     .HasForeignKey(e => e.MemberId)
+                    .IsRequired(false)
                     .OnDelete(DeleteBehavior.Restrict); // Tránh cascade delete conflict
+
+                entity.HasIndex(e => e.Token)
+                    .IsUnique()
+                    .HasFilter("[Token] IS NOT NULL");
 
                 // Indexes for better query performance
                 entity.HasIndex(e => new { e.BusinessOwnerId, e.Status });
