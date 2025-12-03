@@ -39,10 +39,6 @@ namespace MSP.Application.Services.Implementations.Todos
                 // validate đủ trường
                 if (todo == null ||
                     string.IsNullOrWhiteSpace(todo.Title) ||
-                    string.IsNullOrWhiteSpace(todo.Description) ||
-                    todo.StartDate == null ||
-                    todo.EndDate == null ||
-                    todo.UserId == null ||
                     todo.Status == Shared.Enums.TodoStatus.ConvertedToTask ||
                     todo.Status == Shared.Enums.TodoStatus.Deleted)
 
@@ -54,10 +50,10 @@ namespace MSP.Application.Services.Implementations.Todos
                 var task = new Domain.Entities.ProjectTask
                 {
                     Title = todo.Title,
-                    Description = todo.Description,
-                    StartDate = todo.StartDate.Value,
-                    EndDate = todo.EndDate.Value,
-                    UserId = todo.UserId.Value,
+                    Description = todo.Description ?? "",
+                    StartDate = todo.StartDate ?? DateTime.UtcNow,
+                    EndDate = todo.EndDate ?? null,
+                    UserId = todo.UserId ?? null,
                     TodoId = todo.Id,
                     ProjectId = todo.Meeting.ProjectId,
                     Status = Shared.Enums.TaskEnum.Todo.ToString(),
