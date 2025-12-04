@@ -907,64 +907,54 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
 
             // Link đăng ký với email đã điền sẵn
             var signUpLink = $"{clientUrl}/sign-up?email={email}&invitation={token}";
-            var businessPageLink = $"{clientUrl}/business";
 
             var body = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
-                    <div style='text-align: center; margin-bottom: 30px;'>
-                        <h2 style='color: #FF5E13; margin: 0;'>You've Been Invited! 🎉</h2>
-                    </div>
-        
-                    <p style='font-size: 16px; color: #333;'>Hello,</p>
-        
-                    <p style='font-size: 16px; color: #333;'>
-                        <strong>{businessOwner.FullName}</strong> has invited you to join the organization 
-                        <strong style='color: #FF5E13;'>{businessOwner.Organization}</strong>.
-                    </p>
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
+            <div style='text-align: center; margin-bottom: 30px;'>
+                <h2 style='color: #FF5E13; margin: 0;'>You've Been Invited! 🎉</h2>
+            </div>
 
-                    <div style='background: #FDF0D2; border-radius: 12px; padding: 24px; margin: 24px 0;'>
-                        <h3 style='color: #FF5E13; margin-top: 0;'>How to Accept This Invitation</h3>
-            
-                        <div style='margin-bottom: 16px;'>
-                            <p style='font-weight: bold; color: #333; margin-bottom: 8px;'>Step 1: Create Your Account</p>
-                            <p style='color: #666; margin: 0 0 12px 0;'>Click the button below to go to the registration page. Your email will be pre-filled automatically.</p>
-                            <a href='{signUpLink}' 
-                               style='background-color: #FF5E13; color: white; padding: 12px 24px; 
-                                      text-decoration: none; border-radius: 8px; display: inline-block;
-                                      font-weight: bold; font-size: 14px;'>
-                                Create Account
-                            </a>
-                        </div>
+            <p style='font-size: 16px; color: #333;'>Hello,</p>
 
-                        <div style='margin-bottom: 16px;'>
-                            <p style='font-weight: bold; color: #333; margin-bottom: 8px;'>Step 2: Complete Registration</p>
-                            <p style='color: #666; margin: 0;'>Fill in the remaining fields (Full Name, Phone Number, Password) and submit the form.</p>
-                        </div>
+            <p style='font-size: 16px; color: #333;'>
+                <strong>{businessOwner.FullName}</strong> has invited you to join the organization 
+                <strong style='color: #FF5E13;'>{businessOwner.Organization}</strong>.
+            </p>
 
-                        <div style='margin-bottom: 16px;'>
-                            <p style='font-weight: bold; color: #333; margin-bottom: 8px;'>Step 3: Sign In</p>
-                            <p style='color: #666; margin: 0;'>After registration, sign in to your new account.</p>
-                        </div>
+            <div style='background: #FDF0D2; border-radius: 12px; padding: 24px; margin: 24px 0;'>
+                <h3 style='color: #FF5E13; margin-top: 0;'>How to join</h3>
 
-                        <div>
-                            <p style='font-weight: bold; color: #333; margin-bottom: 8px;'>Step 4: Accept the Invitation</p>
-                            <p style='color: #666; margin: 0;'>
-                                Go to <a href='{businessPageLink}' style='color: #FF5E13;'>Business Page</a> 
-                                to view and accept the organization invitation.
-                            </p>
-                        </div>
-                    </div>
+                <p style='color: #666; margin: 0 0 16px 0;'>
+                    Click the button below to go to the registration page. Your email will be pre-filled automatically.
+                </p>
 
-                    <div style='background: #f5f5f5; border-radius: 8px; padding: 16px; margin-top: 24px;'>
-                        <p style='color: #666; font-size: 14px; margin: 0;'>
-                            <strong>Your invited email:</strong> {email}
-                        </p>
-                    </div>
+                <p style='text-align: center; margin: 16px 0 24px 0;'>
+                    <a href='{signUpLink}' 
+                       style='background-color: #FF5E13; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 8px; display: inline-block;
+                              font-weight: bold; font-size: 14px;'>
+                        Create Account
+                    </a>
+                </p>
 
-                    <p style='color: #999; font-size: 12px; margin-top: 24px;'>
-                        If you didn't expect this invitation, you can safely ignore this email.
-                    </p>
-                </div>";
+                <p style='color: #666; margin: 0 0 8px 0;'>
+                    After that, just complete the registration form and confirm your email.
+                </p>
+                <p style='color: #666; margin: 0;'>
+                    Once your email is confirmed, your invitation will be activated automatically.
+                </p>
+            </div>
+
+            <div style='background: #f5f5f5; border-radius: 8px; padding: 16px; margin-top: 24px;'>
+                <p style='color: #666; font-size: 14px; margin: 0;'>
+                    <strong>Your invited email:</strong> {email}
+                </p>
+            </div>
+
+            <p style='color: #999; font-size: 12px; margin-top: 24px;'>
+                If you didn't expect this invitation, you can safely ignore this email.
+            </p>
+        </div>";
 
             _notificationService.SendEmailNotification(
                 email,
