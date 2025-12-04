@@ -92,8 +92,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                             var notificationRequest = new CreateNotificationRequest
                             {
                                 UserId = task.UserId.Value,
-                                Title = "Nhắc nhở hạn chót công việc",
-                                Message = $"Công việc '{task.Title}' sẽ đến hạn trong {daysRemaining} ngày nữa (hạn: {task.EndDate:dd/MM/yyyy}).",
+                                Title = "Task Deadline Reminder",
+                                Message = $"Task '{task.Title}' is due in {daysRemaining} day(s) (deadline: {task.EndDate:dd/MM/yyyy}).",
                                 Type = NotificationTypeEnum.TaskUpdate.ToString(),
                                 EntityId = task.Id.ToString(),
                                 Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -113,13 +113,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                             // Send email notification
                             _notificationService.SendEmailNotification(
                                 user.Email!,
-                                "Nhắc nhở hạn chót công việc",
-                                $"Xin chào {user.FullName},<br/><br/>" +
-                                $"Đây là lời nhắc rằng công việc <strong>{task.Title}</strong> của bạn sẽ đến hạn trong {daysRemaining} ngày nữa.<br/><br/>" +
-                                $"<strong>Dự án:</strong> {project.Name}<br/>" +
-                                $"<strong>Hạn chót:</strong> {task.EndDate:dd/MM/yyyy}<br/>" +
-                                $"<strong>Trạng thái:</strong> {task.Status}<br/><br/>" +
-                                $"Vui lòng đảm bảo hoàn thành công việc đúng hạn.");
+                                "Task Deadline Reminder",
+                                $"Hello {user.FullName},<br/><br/>" +
+                                $"This is a reminder that your task <strong>{task.Title}</strong> is due in {daysRemaining} day(s).<br/><br/>" +
+                                $"<strong>Project:</strong> {project.Name}<br/>" +
+                                $"<strong>Due Date:</strong> {task.EndDate:dd/MM/yyyy}<br/>" +
+                                $"<strong>Status:</strong> {task.Status}<br/><br/>" +
+                                $"Please ensure to complete the task on time.");
 
                             _logger.LogInformation(
                                 "Sent deadline reminder for task {TaskId} ('{TaskTitle}') to user {UserId}. Due in {Days} days",

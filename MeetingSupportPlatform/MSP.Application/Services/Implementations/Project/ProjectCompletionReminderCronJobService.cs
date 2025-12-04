@@ -1,30 +1,36 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Notification;
+using MSP.Domain.Entities;
 using MSP.Shared.Enums;
 
 namespace MSP.Application.Services.Implementations.Project
 {
     /// <summary>
     /// Service to send completion reminder notifications for overdue projects using Hangfire
+    /// Sends notifications to all Project Managers in the project
     /// </summary>
     public class ProjectCompletionReminderCronJobService
     {
         private readonly IProjectRepository _projectRepository;
         private readonly INotificationService _notificationService;
+        private readonly UserManager<User> _userManager;
         private readonly ILogger<ProjectCompletionReminderCronJobService> _logger;
 
         public ProjectCompletionReminderCronJobService(
             IProjectRepository projectRepository,
             INotificationService notificationService,
+            UserManager<User> userManager,
             ILogger<ProjectCompletionReminderCronJobService> logger)
         {
             _projectRepository = projectRepository;
             _notificationService = notificationService;
+            _userManager = userManager;
             _logger = logger;
         }
 
@@ -64,50 +70,95 @@ namespace MSP.Application.Services.Implementations.Project
                                 daysOverdue,
                                 project.EndDate);
 
-                            // Send notification to Project Owner
-                            var notificationRequest = new CreateNotificationRequest
+                            // Get all Project Managers from ProjectMembers
+                            var projectManagers = new List<(Guid UserId, User User)>();
+                            if (project.ProjectMembers?.Any() == true)
                             {
-                                UserId = project.OwnerId,
-                                Title = "Nhắc nhở hoàn thành dự án",
-                                Message = $"Dự án '{project.Name}' đã quá hạn {daysOverdue} ngày (Hạn chót: {project.EndDate:dd/MM/yyyy}). Vui lòng xem xét và đánh dấu hoàn thành nếu dự án đã xong.",
-                                Type = NotificationTypeEnum.ProjectUpdate.ToString(),
-                                EntityId = project.Id.ToString(),
-                                Data = System.Text.Json.JsonSerializer.Serialize(new
+                                var activeMembers = project.ProjectMembers
+                                    .Where(pm => !pm.LeftAt.HasValue)
+                                    .ToList();
+
+                                foreach (var projectMember in activeMembers)
                                 {
-                                    ProjectId = project.Id,
-                                    ProjectName = project.Name,
-                                    EndDate = project.EndDate,
-                                    DaysOverdue = daysOverdue,
-                                    EventType = "ProjectCompletionReminder"
-                                })
-                            };
-
-                            await _notificationService.CreateInAppNotificationAsync(notificationRequest);
-
-                            // Send email notification to owner
-                            var owner = project.Owner;
-                            if (owner != null)
-                            {
-                                _notificationService.SendEmailNotification(
-                                    owner.Email!,
-                                    "Nhắc nhở hoàn thành dự án",
-                                    $"Xin chào {owner.FullName},<br/><br/>" +
-                                    $"Dự án <strong>{project.Name}</strong> đã vượt quá ngày kết thúc dự kiến {daysOverdue} ngày.<br/><br/>" +
-                                    $"<strong>Ngày kết thúc dự kiến:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
-                                    $"<strong>Ngày hiện tại:</strong> {now:dd/MM/yyyy}<br/>" +
-                                    $"<strong>Số ngày quá hạn:</strong> {daysOverdue} ngày<br/>" +
-                                    $"<strong>Trạng thái hiện tại:</strong> Đang thực hiện<br/><br/>" +
-                                    $"Nếu dự án đã hoàn thành, vui lòng cập nhật trạng thái thành 'Hoàn thành' trong hệ thống.<br/>" +
-                                    $"Nếu dự án cần thêm thời gian, vui lòng xem xét điều chỉnh ngày kết thúc.");
+                                    var roles = await _userManager.GetRolesAsync(projectMember.Member);
+                                    if (roles.Contains(UserRoleEnum.ProjectManager.ToString()))
+                                    {
+                                        projectManagers.Add((projectMember.MemberId, projectMember.Member));
+                                    }
+                                }
                             }
 
-                            notificationsSent++;
+                            if (!projectManagers.Any())
+                            {
+                                _logger.LogWarning(
+                                    "No Project Managers found for project {ProjectId}. Skipping notification.",
+                                    project.Id);
+                                continue;
+                            }
 
                             _logger.LogInformation(
-                                "Sent completion reminder for project {ProjectId} to owner {OwnerId}. Overdue by {Days} days",
-                                project.Id,
-                                project.OwnerId,
-                                daysOverdue);
+                                "Found {Count} Project Manager(s) for project {ProjectId}",
+                                projectManagers.Count,
+                                project.Id);
+
+                            // Send notifications to all Project Managers
+                            foreach (var (pmUserId, pmUser) in projectManagers)
+                            {
+                                try
+                                {
+                                    // Send in-app notification
+                                    var notificationRequest = new CreateNotificationRequest
+                                    {
+                                        UserId = pmUserId,
+                                        Title = "Project Completion Reminder",
+                                        Message = $"Project '{project.Name}' is overdue by {daysOverdue} day(s) (Deadline: {project.EndDate:dd/MM/yyyy}). Please review and mark as completed if finished.",
+                                        Type = NotificationTypeEnum.ProjectUpdate.ToString(),
+                                        EntityId = project.Id.ToString(),
+                                        Data = System.Text.Json.JsonSerializer.Serialize(new
+                                        {
+                                            ProjectId = project.Id,
+                                            ProjectName = project.Name,
+                                            EndDate = project.EndDate,
+                                            DaysOverdue = daysOverdue,
+                                            EventType = "ProjectCompletionReminder"
+                                        })
+                                    };
+
+                                    await _notificationService.CreateInAppNotificationAsync(notificationRequest);
+
+                                    // Send email notification
+                                    if (pmUser != null && !string.IsNullOrEmpty(pmUser.Email))
+                                    {
+                                        _notificationService.SendEmailNotification(
+                                            pmUser.Email,
+                                            "Project Completion Reminder",
+                                            $"Hello {pmUser.FullName},<br/><br/>" +
+                                            $"Project <strong>{project.Name}</strong> has exceeded its expected end date by {daysOverdue} day(s).<br/><br/>" +
+                                            $"<strong>Expected End Date:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
+                                            $"<strong>Current Date:</strong> {now:dd/MM/yyyy}<br/>" +
+                                            $"<strong>Days Overdue:</strong> {daysOverdue} day(s)<br/>" +
+                                            $"<strong>Current Status:</strong> In Progress<br/><br/>" +
+                                            $"If the project is completed, please update its status to 'Completed' in the system.<br/>" +
+                                            $"If the project needs more time, please consider adjusting the end date.");
+                                    }
+
+                                    notificationsSent++;
+
+                                    _logger.LogInformation(
+                                        "Sent completion reminder for project {ProjectId} to PM {UserId}. Overdue by {Days} days",
+                                        project.Id,
+                                        pmUserId,
+                                        daysOverdue);
+                                }
+                                catch (Exception innerEx)
+                                {
+                                    _logger.LogError(innerEx,
+                                        "Failed to send completion reminder to PM {UserId} for project {ProjectId}",
+                                        pmUserId,
+                                        project.Id);
+                                    // Continue with other PMs
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {

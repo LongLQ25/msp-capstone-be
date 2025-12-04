@@ -55,6 +55,48 @@ namespace MSP.Application.Services.Implementations.Project
             };
 
             _ = await _projectMemberRepository.AddAsync(projectMember);
+            await _projectMemberRepository.SaveChangesAsync();
+
+            // Send notification to the new member
+            try
+            {
+                var notificationRequest = new CreateNotificationRequest
+                {
+                    UserId = request.UserId,
+                    Title = "👥 Added to Project",
+                    Message = $"You have been added to the project '{project.Name}'. Welcome to the team!",
+                    Type = NotificationTypeEnum.ProjectUpdate.ToString(),
+                    EntityId = project.Id.ToString(),
+                    Data = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        ProjectId = project.Id,
+                        ProjectName = project.Name,
+                        JoinedAt = projectMember.JoinedAt,
+                        EventType = "MemberAdded"
+                    })
+                };
+
+                await _notificationService.CreateInAppNotificationAsync(notificationRequest);
+
+                // Send email notification
+                _notificationService.SendEmailNotification(
+                    user.Email!,
+                    "Added to Project",
+                    $"Hello {user.FullName},<br/><br/>" +
+                    $"You have been added to the project <strong>{project.Name}</strong>.<br/><br/>" +
+                    $"<strong>Project Details:</strong><br/>" +
+                    $"<strong>📝 Name:</strong> {project.Name}<br/>" +
+                    $"<strong>📄 Description:</strong> {project.Description ?? "No description"}<br/>" +
+                    $"<strong>📅 Start Date:</strong> {project.StartDate:dd/MM/yyyy}<br/>" +
+                    $"<strong>📅 End Date:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
+                    $"<strong>📊 Status:</strong> {project.Status}<br/><br/>" +
+                    $"Welcome to the team! You can now access and collaborate on this project.");
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail the operation
+                Console.WriteLine($"Failed to send notification to new member {request.UserId}: {ex.Message}");
+            }
 
             var response = new GetProjectMemberResponse
             {
@@ -64,7 +106,6 @@ namespace MSP.Application.Services.Implementations.Project
                 JoinedAt = projectMember.JoinedAt,
             };
 
-            await _projectMemberRepository.SaveChangesAsync();
             return ApiResponse<GetProjectMemberResponse>.SuccessResponse(response);
         }
 
@@ -609,8 +650,8 @@ namespace MSP.Application.Services.Implementations.Project
                         var ownerNotification = new CreateNotificationRequest
                         {
                             UserId = owner.Id,
-                            Title = "🎉 Dự án hoàn thành",
-                            Message = $"Dự án '{project.Name}' đã được đánh dấu là hoàn thành. Làm tốt lắm!",
+                            Title = "🎉 Project Completed",
+                            Message = $"Project '{project.Name}' has been marked as completed. Great job!",
                             Type = NotificationTypeEnum.ProjectUpdate.ToString(),
                             EntityId = project.Id.ToString(),
                             Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -627,13 +668,13 @@ namespace MSP.Application.Services.Implementations.Project
                         // Send email to owner
                         _notificationService.SendEmailNotification(
                             owner.Email!,
-                            "Dự án hoàn thành",
-                            $"Xin chào {owner.FullName},<br/><br/>" +
-                            $"Chúc mừng! Dự án <strong>{project.Name}</strong> đã được hoàn thành thành công.<br/><br/>" +
-                            $"<strong>Ngày bắt đầu:</strong> {project.StartDate:dd/MM/yyyy}<br/>" +
-                            $"<strong>Ngày kết thúc:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
-                            $"<strong>Hoàn thành vào:</strong> {DateTime.UtcNow:dd/MM/yyyy}<br/><br/>" +
-                            $"Cảm ơn bạn đã lãnh đạo và giám sát dự án này.");
+                            "Project Completed",
+                            $"Hello {owner.FullName},<br/><br/>" +
+                            $"Congratulations! Project <strong>{project.Name}</strong> has been completed successfully.<br/><br/>" +
+                            $"<strong>Start Date:</strong> {project.StartDate:dd/MM/yyyy}<br/>" +
+                            $"<strong>End Date:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
+                            $"<strong>Completed At:</strong> {DateTime.UtcNow:dd/MM/yyyy}<br/><br/>" +
+                            $"Thank you for leading and overseeing this project.");
                     }
 
                     // Send notifications to all active Project Members
@@ -650,8 +691,8 @@ namespace MSP.Application.Services.Implementations.Project
                                 var memberNotification = new CreateNotificationRequest
                                 {
                                     UserId = projectMember.MemberId,
-                                    Title = "🎉 Dự án hoàn thành",
-                                    Message = $"Dự án '{project.Name}' đã hoàn thành. Cảm ơn sự đóng góp của bạn!",
+                                    Title = "🎉 Project Completed",
+                                    Message = $"Project '{project.Name}' has been completed. Thank you for your contribution!",
                                     Type = NotificationTypeEnum.ProjectUpdate.ToString(),
                                     EntityId = project.Id.ToString(),
                                     Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -705,8 +746,8 @@ namespace MSP.Application.Services.Implementations.Project
                         var ownerNotification = new CreateNotificationRequest
                         {
                             UserId = owner.Id,
-                            Title = "⚠️ Dự án đã bị hủy",
-                            Message = $"Dự án '{project.Name}' đã được đánh dấu là hủy bỏ.",
+                            Title = "⚠️ Project Cancelled",
+                            Message = $"Project '{project.Name}' has been marked as cancelled.",
                             Type = NotificationTypeEnum.ProjectUpdate.ToString(),
                             EntityId = project.Id.ToString(),
                             Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -723,13 +764,13 @@ namespace MSP.Application.Services.Implementations.Project
                         // Send email to owner
                         _notificationService.SendEmailNotification(
                             owner.Email!,
-                            "Dự án đã bị hủy",
-                            $"Xin chào {owner.FullName},<br/><br/>" +
-                            $"Dự án <strong>{project.Name}</strong> đã được đánh dấu là hủy bỏ.<br/><br/>" +
-                            $"<strong>Ngày bắt đầu:</strong> {project.StartDate:dd/MM/yyyy}<br/>" +
-                            $"<strong>Ngày kết thúc dự kiến:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
-                            $"<strong>Hủy bỏ vào:</strong> {DateTime.UtcNow:dd/MM/yyyy}<br/><br/>" +
-                            $"Tất cả công việc chưa hoàn thành đã được tự động hủy.");
+                            "Project Cancelled",
+                            $"Hello {owner.FullName},<br/><br/>" +
+                            $"Project <strong>{project.Name}</strong> has been marked as cancelled.<br/><br/>" +
+                            $"<strong>Start Date:</strong> {project.StartDate:dd/MM/yyyy}<br/>" +
+                            $"<strong>Expected End Date:</strong> {project.EndDate:dd/MM/yyyy}<br/>" +
+                            $"<strong>Cancelled At:</strong> {DateTime.UtcNow:dd/MM/yyyy}<br/><br/>" +
+                            $"All incomplete tasks have been automatically cancelled.");
                     }
 
                     // Send notifications to all active Project Members
@@ -746,8 +787,8 @@ namespace MSP.Application.Services.Implementations.Project
                                 var memberNotification = new CreateNotificationRequest
                                 {
                                     UserId = projectMember.MemberId,
-                                    Title = "⚠️ Dự án đã bị hủy",
-                                    Message = $"Dự án '{project.Name}' đã bị hủy. Tất cả công việc chưa hoàn thành đã được tự động hủy.",
+                                    Title = "⚠️ Project Cancelled",
+                                    Message = $"Project '{project.Name}' has been cancelled. All incomplete tasks have been automatically cancelled.",
                                     Type = NotificationTypeEnum.ProjectUpdate.ToString(),
                                     EntityId = project.Id.ToString(),
                                     Data = System.Text.Json.JsonSerializer.Serialize(new

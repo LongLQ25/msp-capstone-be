@@ -594,8 +594,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                 {
                                     UserId = task.UserId.Value,
                                     ActorId = request.ActorId,
-                                    Title = "Công việc được mở lại",
-                                    Message = $"Công việc '{task.Title}' đã được mở lại bởi Project Manager trong dự án {project.Name}",
+                                    Title = "Task Reopened",
+                                    Message = $"Task '{task.Title}' has been reopened by Project Manager in project {project.Name}",
                                     Type = NotificationTypeEnum.TaskUpdate.ToString(),
                                     EntityId = task.Id.ToString(),
                                     Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -614,15 +614,15 @@ namespace MSP.Application.Services.Implementations.ProjectTask
 
                                 _notificationService.SendEmailNotification(
                                     assignee.Email!,
-                                    "Công việc được mở lại",
-                                    $"Xin chào {assignee.FullName},<br/><br/>" +
-                                    $"Công việc <strong>{task.Title}</strong> đã được Project Manager mở lại.<br/><br/>" +
-                                    $"📋 <strong>Công việc:</strong> {task.Title}<br/>" +
-                                    $"📁 <strong>Dự án:</strong> {project.Name}<br/>" +
-                                    $"🔄 <strong>Trạng thái cũ:</strong> {oldStatus}<br/>" +
-                                    $"✅ <strong>Trạng thái mới:</strong> {request.Status}<br/>" +
-                                    $"📅 <strong>Hạn chót:</strong> {task.EndDate:dd/MM/yyyy}<br/><br/>" +
-                                    $"Vui lòng kiểm tra và tiếp tục thực hiện công việc này."
+                                    "Task Reopened",
+                                    $"Hello {assignee.FullName},<br/><br/>" +
+                                    $"Task <strong>{task.Title}</strong> has been reopened by Project Manager.<br/><br/>" +
+                                    $"📋 <strong>Task:</strong> {task.Title}<br/>" +
+                                    $"📁 <strong>Project:</strong> {project.Name}<br/>" +
+                                    $"🔄 <strong>Old Status:</strong> {oldStatus}<br/>" +
+                                    $"✅ <strong>New Status:</strong> {request.Status}<br/>" +
+                                    $"📅 <strong>Due Date:</strong> {task.EndDate:dd/MM/yyyy}<br/><br/>" +
+                                    $"Please review and continue working on this task."
                                 );
                             }
                         }

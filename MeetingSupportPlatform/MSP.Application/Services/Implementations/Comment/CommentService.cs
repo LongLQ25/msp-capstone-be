@@ -68,8 +68,8 @@ namespace MSP.Application.Services.Implementations.Comment
                     {
                         UserId = task.UserId.Value,
                         ActorId = request.UserId,
-                        Title = "Comment mới trên task",
-                        Message = $"{user.FullName} đã comment trên task '{task.Title}'",
+                        Title = "New Comment on Task",
+                        Message = $"{user.FullName} commented on task '{task.Title}'",
                         Type = NotificationTypeEnum.TaskUpdate.ToString(),
                         EntityId = task.Id.ToString(),
                         Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -99,8 +99,8 @@ namespace MSP.Application.Services.Implementations.Comment
                     {
                         UserId = task.ReviewerId.Value,
                         ActorId = request.UserId,
-                        Title = "Comment mới trên task đang review",
-                        Message = $"{user.FullName} Đã comment trên task '{task.Title}' mà bạn đang review",
+                        Title = "New Comment on Task Under Review",
+                        Message = $"{user.FullName} commented on task '{task.Title}' that you are reviewing",
                         Type = NotificationTypeEnum.TaskUpdate.ToString(),
                         EntityId = task.Id.ToString(),
                         Data = System.Text.Json.JsonSerializer.Serialize(new

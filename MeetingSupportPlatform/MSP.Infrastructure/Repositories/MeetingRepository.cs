@@ -77,6 +77,20 @@ namespace MSP.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Meeting>> GetUpcomingMeetingsForReminderAsync(DateTime startWindow, DateTime endWindow, string scheduledStatus)
+        {
+            return await _context.Meetings
+                .Include(m => m.Attendees)
+                .Include(m => m.CreatedBy)
+                .Include(m => m.Project)
+                .Where(m =>
+                    !m.IsDeleted &&
+                    m.Status == scheduledStatus &&
+                    m.StartTime >= startWindow &&
+                    m.StartTime <= endWindow)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<Meeting>> GetMeetingsByUserIdAsync(Guid userId)
         {
             var meetings = await _context.Meetings

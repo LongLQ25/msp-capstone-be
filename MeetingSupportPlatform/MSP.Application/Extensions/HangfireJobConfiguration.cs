@@ -28,7 +28,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<TaskStatusCronJobService>(
                 "update-overdue-tasks",
                 service => service.UpdateOverdueTasksAsync(),
-                Cron.Daily(), // Run every day at 12:00 AM Vietnam time
+                Cron.Daily(8), // Run every day at 8:00 AM Vietnam time (start of work day)
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -54,7 +54,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<ProjectStatusCronJobService>(
                 "update-project-statuses",
                 service => service.UpdateProjectStatusesAsync(),
-                Cron.Daily(), // Run every day at 12:00 AM Vietnam time
+                Cron.Daily(7), // Run every day at 7:00 AM Vietnam time (before work starts)
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -65,7 +65,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<CleanupExpiredTokensCronJobService>(
                 "cleanup-expired-tokens",
                 service => service.CleanupExpiredTokensAsync(),
-                Cron.Daily(), // Run daily at 12:00 AM Vietnam time
+                Cron.Daily(2), // Run daily at 2:00 AM Vietnam time (low traffic period)
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -76,7 +76,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<CleanupPendingInvitationsCronJobService>(
                 "cleanup-pending-invitations",
                 service => service.CleanupExpiredInvitationsAsync(),
-                Cron.Daily(), // Run daily at 12:00 AM Vietnam time
+                Cron.Daily(3), // Run daily at 3:00 AM Vietnam time (low traffic period)
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -87,7 +87,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<TaskReminderCronJobService>(
                 "send-task-deadline-reminders",
                 service => service.SendDeadlineRemindersAsync(),
-                Cron.Daily(), // Run daily at 12:00 AM Vietnam time
+                Cron.Daily(9), // Run daily at 9:00 AM Vietnam time (users have full day to handle)
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -98,7 +98,18 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<ProjectCompletionReminderCronJobService>(
                 "send-project-completion-reminders",
                 service => service.SendCompletionRemindersAsync(),
-                Cron.Daily(), // Run daily at 12:00 AM Vietnam time
+                Cron.Daily(10), // Run daily at 10:00 AM Vietnam time (PMs are active at work)
+                new RecurringJobOptions
+                {
+                    TimeZone = vietnamTimeZone
+                });
+
+            // 8. Meeting Reminder
+            // Send reminder notifications for meetings starting in 1 hour
+            RecurringJob.AddOrUpdate<MeetingReminderCronJobService>(
+                "send-meeting-reminders",
+                service => service.SendMeetingRemindersAsync(),
+                "*/10 * * * *", // Run every 10 minutes
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -124,7 +135,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<TaskStatusCronJobService>(
                 "update-overdue-tasks",
                 service => service.UpdateOverdueTasksAsync(),
-                Cron.Daily(),
+                Cron.Daily(8), // 8:00 AM - start of work day
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -142,7 +153,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<ProjectStatusCronJobService>(
                 "update-project-statuses",
                 service => service.UpdateProjectStatusesAsync(),
-                Cron.Daily(),
+                Cron.Daily(7), // 7:00 AM - before work starts
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -151,7 +162,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<CleanupExpiredTokensCronJobService>(
                 "cleanup-expired-tokens",
                 service => service.CleanupExpiredTokensAsync(),
-                Cron.Daily(),
+                Cron.Daily(2), // 2:00 AM - low traffic period
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -160,7 +171,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<CleanupPendingInvitationsCronJobService>(
                 "cleanup-pending-invitations",
                 service => service.CleanupExpiredInvitationsAsync(),
-                Cron.Daily(),
+                Cron.Daily(3), // 3:00 AM - low traffic period
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -169,7 +180,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<TaskReminderCronJobService>(
                 "send-task-deadline-reminders",
                 service => service.SendDeadlineRemindersAsync(),
-                Cron.Daily(),
+                Cron.Daily(9), // 9:00 AM - users have full day to handle
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -178,7 +189,7 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<ProjectCompletionReminderCronJobService>(
                 "send-project-completion-reminders",
                 service => service.SendCompletionRemindersAsync(),
-                Cron.Daily(),
+                Cron.Daily(10), // 10:00 AM - PMs are active at work
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone
@@ -187,7 +198,16 @@ namespace MSP.Application.Extensions
             RecurringJob.AddOrUpdate<SubscriptionStatusCronJobService>(
                 "expire-subscriptions",
                 service => service.ExpireSubscriptionsAsync(),
-                Cron.Daily(), // run daily at 00:00
+                Cron.Daily(1), // Run daily at 1:00 AM - low traffic period
+                new RecurringJobOptions
+                {
+                    TimeZone = vietnamTimeZone
+                });
+
+            RecurringJob.AddOrUpdate<MeetingReminderCronJobService>(
+                "send-meeting-reminders",
+                service => service.SendMeetingRemindersAsync(),
+                "*/10 * * * *", // Run every 10 minutes
                 new RecurringJobOptions
                 {
                     TimeZone = vietnamTimeZone

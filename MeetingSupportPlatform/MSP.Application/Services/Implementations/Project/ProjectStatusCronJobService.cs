@@ -1,29 +1,34 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Notification;
+using MSP.Domain.Entities;
 using MSP.Shared.Enums;
 
 namespace MSP.Application.Services.Implementations.Project
 {
     /// <summary>
     /// Service to automatically update project statuses using Hangfire
-    /// - Scheduled ? InProgress when StartDate is reached
-    /// - Send notifications to Owner and Members when project is nearing deadline
+    /// - Scheduled → InProgress when StartDate is reached
+    /// - Send notifications to PM (Owner) only when project is nearing deadline
     /// </summary>
     public class ProjectStatusCronJobService
     {
         private readonly IProjectRepository _projectRepository;
         private readonly INotificationService _notificationService;
+        private readonly UserManager<User> _userManager;
         private readonly ILogger<ProjectStatusCronJobService> _logger;
 
         public ProjectStatusCronJobService(
             IProjectRepository projectRepository,
             INotificationService notificationService,
+            UserManager<User> userManager,
             ILogger<ProjectStatusCronJobService> logger)
         {
             _projectRepository = projectRepository;
             _notificationService = notificationService;
+            _userManager = userManager;
             _logger = logger;
         }
 
@@ -92,67 +97,64 @@ namespace MSP.Application.Services.Implementations.Project
                             project.EndDate,
                             deadlineText);
 
-                        // 2.1. Send notification to Project Owner
-                        try
-                        {
-                            await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
-                            {
-                                UserId = project.OwnerId,
-                                Title = "⚠️ Cảnh báo hạn chót dự án",
-                                Message = $"Dự án '{project.Name}' sắp đến hạn {deadlineText} (Ngày kết thúc: {project.EndDate:dd/MM/yyyy}). Vui lòng xem xét tiến độ dự án.",
-                                Type = NotificationTypeEnum.InApp.ToString(),
-                                Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
-                            });
-
-                            notificationsSent++;
-                            
-                            _logger.LogInformation(
-                                "Sent deadline notification to Owner {OwnerId} for project {ProjectId}",
-                                project.OwnerId,
-                                project.Id);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, 
-                                "Failed to send notification to Owner {OwnerId} for project {ProjectId}",
-                                project.OwnerId,
-                                project.Id);
-                        }
-
-                        // 2.2. Send notifications to all active Project Members
+                        // Get all Project Managers from ProjectMembers
+                        var projectManagers = new List<Guid>();
                         if (project.ProjectMembers?.Any() == true)
                         {
                             var activeMembers = project.ProjectMembers
-                                .Where(pm => !pm.LeftAt.HasValue) // Only active members
+                                .Where(pm => !pm.LeftAt.HasValue)
                                 .ToList();
-
-                            _logger.LogInformation(
-                                "Sending deadline notifications to {Count} active members of project {ProjectId}",
-                                activeMembers.Count,
-                                project.Id);
 
                             foreach (var projectMember in activeMembers)
                             {
-                                try
+                                var roles = await _userManager.GetRolesAsync(projectMember.Member);
+                                if (roles.Contains(UserRoleEnum.ProjectManager.ToString()))
                                 {
-                                    await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
-                                    {
-                                        UserId = projectMember.MemberId,
-                                        Title = "⚠️ Cảnh báo hạn chót dự án",
-                                        Message = $"Dự án '{project.Name}' sắp đến hạn {deadlineText} (Ngày kết thúc: {project.EndDate:dd/MM/yyyy}). Vui lòng hoàn thành công việc đúng hạn.",
-                                        Type = NotificationTypeEnum.InApp.ToString(),
-                                        Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
-                                    });
+                                    projectManagers.Add(projectMember.MemberId);
+                                }
+                            }
+                        }
 
-                                    notificationsSent++;
-                                }
-                                catch (Exception ex)
+                        if (!projectManagers.Any())
+                        {
+                            _logger.LogWarning(
+                                "No Project Managers found for project {ProjectId}. Skipping notification.",
+                                project.Id);
+                            continue;
+                        }
+
+                        _logger.LogInformation(
+                            "Found {Count} Project Manager(s) for project {ProjectId}",
+                            projectManagers.Count,
+                            project.Id);
+
+                        // Send notification to all Project Managers
+                        foreach (var pmUserId in projectManagers)
+                        {
+                            try
+                            {
+                                await _notificationService.CreateInAppNotificationAsync(new CreateNotificationRequest
                                 {
-                                    _logger.LogError(ex,
-                                        "Failed to send notification to Member {MemberId} for project {ProjectId}",
-                                        projectMember.MemberId,
-                                        project.Id);
-                                }
+                                    UserId = pmUserId,
+                                    Title = "⚠️ Project Deadline Warning",
+                                    Message = $"Project '{project.Name}' is due {deadlineText} (End date: {project.EndDate:dd/MM/yyyy}). Please review project progress.",
+                                    Type = NotificationTypeEnum.InApp.ToString(),
+                                    Data = $"{{\"eventType\":\"ProjectDeadlineWarning\",\"projectId\":\"{project.Id}\",\"projectName\":\"{project.Name}\",\"endDate\":\"{project.EndDate:dd/MM/yyyy}\",\"daysRemaining\":{daysRemaining}}}"
+                                });
+
+                                notificationsSent++;
+                                
+                                _logger.LogInformation(
+                                    "Sent deadline notification to PM {UserId} for project {ProjectId}",
+                                    pmUserId,
+                                    project.Id);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, 
+                                    "Failed to send notification to PM {UserId} for project {ProjectId}",
+                                    pmUserId,
+                                    project.Id);
                             }
                         }
                     }

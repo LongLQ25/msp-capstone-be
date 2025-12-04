@@ -65,6 +65,7 @@ namespace MSP.Application.Extensions
             // Register Hangfire Job Services
             services.AddScoped<TaskStatusCronJobService>();
             services.AddScoped<MeetingStatusCronJobService>();
+            services.AddScoped<MeetingReminderCronJobService>();
             services.AddScoped<ProjectStatusCronJobService>();
             services.AddScoped<CleanupExpiredTokensCronJobService>();
             services.AddScoped<CleanupPendingInvitationsCronJobService>();
