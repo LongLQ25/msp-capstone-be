@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using MSP.Application.Models.Requests.Notification;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Notification;
+using MSP.Application.Services.Interfaces.Project;
 using MSP.Domain.Entities;
 using MSP.Shared.Enums;
 
@@ -15,19 +16,22 @@ namespace MSP.Application.Services.Implementations.Project
     /// </summary>
     public class ProjectStatusCronJobService
     {
-        private readonly IProjectRepository _projectRepository;
-        private readonly INotificationService _notificationService;
-        private readonly UserManager<User> _userManager;
-        private readonly ILogger<ProjectStatusCronJobService> _logger;
+    private readonly IProjectRepository _projectRepository;
+    private readonly INotificationService _notificationService;
+    private readonly IProjectService _projectService;
+    private readonly UserManager<User> _userManager;
+    private readonly ILogger<ProjectStatusCronJobService> _logger;
 
         public ProjectStatusCronJobService(
             IProjectRepository projectRepository,
             INotificationService notificationService,
+            IProjectService projectService,
             UserManager<User> userManager,
             ILogger<ProjectStatusCronJobService> logger)
         {
             _projectRepository = projectRepository;
             _notificationService = notificationService;
+            _projectService = projectService;
             _userManager = userManager;
             _logger = logger;
         }
@@ -97,36 +101,31 @@ namespace MSP.Application.Services.Implementations.Project
                             project.EndDate,
                             deadlineText);
 
-                        // Get all Project Managers from ProjectMembers
+                        // Use ProjectService to get Project Managers (more reliable)
                         var projectManagers = new List<Guid>();
-                        if (project.ProjectMembers?.Any() == true)
+                        try
                         {
-                            var activeMembers = project.ProjectMembers
-                                .Where(pm => !pm.LeftAt.HasValue)
-                                .ToList();
-
-                            foreach (var projectMember in activeMembers)
+                            var pmResponse = await _projectService.GetProjectManagersAsync(project.Id);
+                            if (pmResponse == null || !pmResponse.Success || pmResponse.Data == null || !pmResponse.Data.Any())
                             {
-                                var roles = await _userManager.GetRolesAsync(projectMember.Member);
-                                if (roles.Contains(UserRoleEnum.ProjectManager.ToString()))
-                                {
-                                    projectManagers.Add(projectMember.MemberId);
-                                }
+                                _logger.LogWarning(
+                                    "No Project Managers found for project {ProjectId} via ProjectService. Skipping notification.",
+                                    project.Id);
+                                continue;
                             }
-                        }
 
-                        if (!projectManagers.Any())
-                        {
-                            _logger.LogWarning(
-                                "No Project Managers found for project {ProjectId}. Skipping notification.",
+                            projectManagers = pmResponse.Data.Select(pm => pm.UserId).ToList();
+
+                            _logger.LogInformation(
+                                "Found {Count} Project Manager(s) for project {ProjectId} via ProjectService",
+                                projectManagers.Count,
                                 project.Id);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to retrieve Project Managers for project {ProjectId} via ProjectService", project.Id);
                             continue;
                         }
-
-                        _logger.LogInformation(
-                            "Found {Count} Project Manager(s) for project {ProjectId}",
-                            projectManagers.Count,
-                            project.Id);
 
                         // Send notification to all Project Managers
                         foreach (var pmUserId in projectManagers)
