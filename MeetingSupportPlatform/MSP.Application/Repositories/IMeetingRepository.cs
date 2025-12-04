@@ -19,6 +19,6 @@ namespace MSP.Application.Repositories
         Task<IEnumerable<Meeting>> GetUpcomingMeetingsForReminderAsync(DateTime startWindow, DateTime endWindow, string scheduledStatus);
         Task<IEnumerable<Meeting>> GetMeetingsByUserIdAsync(Guid userId);
 
-        Task<int> CountMeetingsAsync(Guid businessOwnerId, DateTime? startDate, DateTime? endDate);
+        Task<int> CountMeetingsAsync(Guid businessOwnerId);
     }
 }
