@@ -96,8 +96,8 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                         var notificationRequest = new CreateNotificationRequest
                                         {
                                             UserId = task.UserId.Value,
-                                            Title = "Công việc quá hạn",
-                                            Message = $"Công việc '{task.Title}' đã quá hạn {daysOverdue} ngày",
+                                            Title = "Task Overdue",
+                                            Message = $"Task '{task.Title}' is overdue by {daysOverdue} day(s)",
                                             Type = NotificationTypeEnum.TaskUpdate.ToString(),
                                             EntityId = task.Id.ToString(),
                                             Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -118,13 +118,13 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                                         // Send email notification
                                         _notificationService.SendEmailNotification(
                                             user.Email!,
-                                            "Công việc quá hạn",
-                                            $"Xin chào {user.FullName},<br/><br/>" +
-                                            $"Công việc <strong>{task.Title}</strong> của bạn hiện đã quá hạn {daysOverdue} ngày.<br/><br/>" +
-                                            $"<strong>Dự án:</strong> {project.Name}<br/>" +
-                                            $"<strong>Hạn chót:</strong> {task.EndDate:dd/MM/yyyy}<br/>" +
-                                            $"<strong>Trạng thái:</strong> {task.Status}<br/><br/>" +
-                                            $"Vui lòng hoàn thành công việc này càng sớm càng tốt.");
+                                            "Task Overdue",
+                                            $"Hello {user.FullName},<br/><br/>" +
+                                            $"Your task <strong>{task.Title}</strong> is now overdue by {daysOverdue} day(s).<br/><br/>" +
+                                            $"<strong>Project:</strong> {project.Name}<br/>" +
+                                            $"<strong>Due Date:</strong> {task.EndDate:dd/MM/yyyy}<br/>" +
+                                            $"<strong>Status:</strong> {task.Status}<br/><br/>" +
+                                            $"Please complete this task as soon as possible.");
 
                                         notificationsSent++;
 
