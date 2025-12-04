@@ -213,14 +213,15 @@ namespace MSP.Application.Services.Implementations.Todos
                 return ApiResponse<GetTodoResponse>.ErrorResponse(null, "Todo not found");
 
 
-            if (!string.IsNullOrWhiteSpace(request.Title))
-                todo.Title = request.Title;
-
-            if (!string.IsNullOrWhiteSpace(request.Description))
-                todo.Description = request.Description;
+            if (string.IsNullOrWhiteSpace(request.Title))
+                return ApiResponse<GetTodoResponse>.ErrorResponse(null, "Todo Name cannot be empty!");
+            todo.Title = request.Title;
+            todo.Description = request.Description;
 
             if (request.AssigneeId.HasValue)
-                todo.UserId = request.AssigneeId.Value;
+                todo.UserId = request.AssigneeId;
+            else
+                todo.UserId = null;
 
             if (request.StartDate.HasValue)
                 todo.StartDate = request.StartDate.Value;
