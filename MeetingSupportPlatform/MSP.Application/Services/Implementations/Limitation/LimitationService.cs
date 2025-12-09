@@ -140,5 +140,6 @@ namespace MSP.Application.Services.Implementations.Limitation
                 return ApiResponse<List<GetLimitationResponse>>.ErrorResponse(null, ex.Message);
             }
         }
+   
     }
 }
