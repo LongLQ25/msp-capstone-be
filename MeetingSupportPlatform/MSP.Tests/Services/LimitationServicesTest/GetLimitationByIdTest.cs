@@ -1,6 +1,7 @@
 ﻿using Moq;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Implementations.Limitation;
+using MSP.Application.Services.Interfaces.Limitation;
 using MSP.Domain.Entities;
 using Xunit;
 
@@ -9,7 +10,7 @@ namespace MSP.Tests.Services.LimitationServicesTest
     public class GetLimitationByIdTest
     {
         private readonly Mock<ILimitationRepository> _mockLimitationRepository;
-        private readonly LimitationService _limitationService;
+        private readonly ILimitationService _limitationService;
 
         public GetLimitationByIdTest()
         {

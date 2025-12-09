@@ -2,6 +2,7 @@
 using MSP.Application.Models.Requests.Limitation;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Implementations.Limitation;
+using MSP.Application.Services.Interfaces.Limitation;
 using MSP.Domain.Entities;
 using Xunit;
 
@@ -10,7 +11,7 @@ namespace MSP.Tests.Services.LimitationServicesTest
     public class UpdateLimitationTest
     {
         private readonly Mock<ILimitationRepository> _mockLimitationRepository;
-        private readonly LimitationService _limitationService;
+        private readonly ILimitationService _limitationService;
 
         public UpdateLimitationTest()
         {
