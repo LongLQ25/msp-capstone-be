@@ -139,7 +139,8 @@ app.UseHangfireJobs();
 // 1. /notificationHub - for localhost/backward compatibility
 // 2. /api/v1/notificationHub - for production (matches API routing)
 app.MapHub<NotificationHub>("/notificationHub");
-app.MapHub<NotificationHub>("/api/v1/notificationHub");
+app.MapHub<NotificationHub>("/api/v1/notificationHub")
+    .RequireCors("AllowWeb"); // Apply CORS policy to the hub
 
 app.MapControllers();
 app.Run();
