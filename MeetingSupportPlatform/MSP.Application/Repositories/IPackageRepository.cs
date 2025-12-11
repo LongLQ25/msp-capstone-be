@@ -12,6 +12,5 @@ namespace MSP.Application.Repositories
         Task<List<Package>> GetAll();
         Task<List<Package>> GetByIdsAsync(IEnumerable<Guid> ids);
         Task<Package?> GetFreePackageAsync();
-
     }
 }
