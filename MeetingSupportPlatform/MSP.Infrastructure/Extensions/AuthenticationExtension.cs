@@ -52,7 +52,8 @@ namespace MSP.Infrastructure.Extensions
 
                         // SignalR Hub uses query string for token
                         if (!string.IsNullOrEmpty(accessToken) &&
-                            path.StartsWithSegments("/notificationHub"))
+                            (path.StartsWithSegments("/notificationHub") ||
+                             path.StartsWithSegments("/api/v1/notificationHub")))
                         {
                             context.Token = accessToken;
                             return Task.CompletedTask;
