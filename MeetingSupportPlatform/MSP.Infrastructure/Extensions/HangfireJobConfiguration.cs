@@ -6,7 +6,7 @@ using MSP.Application.Services.Implementations.Project;
 using MSP.Application.Services.Implementations.ProjectTask;
 using MSP.Application.Services.Implementations.SubscriptionService;
 
-namespace MSP.Application.Extensions
+namespace MSP.Infrastructure.Extensions
 {
     /// <summary>
     /// Extension methods to configure Hangfire Recurring Jobs
