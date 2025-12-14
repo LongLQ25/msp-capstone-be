@@ -108,7 +108,7 @@ namespace MSP.Infrastructure.Repositories
         {
             var query = _context.Meetings.AsQueryable();
 
-            //query = query.Where(m => m.CreatedBy.ManagedById == businessOwnerId);
+            query = query.Where(m => m.CreatedBy.ManagedById == businessOwnerId);
 
             //if (startDate.HasValue)
             //    query = query.Where(m => m.StartTime.Date >= startDate.Value.Date);
