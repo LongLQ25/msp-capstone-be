@@ -517,16 +517,92 @@ namespace MSP.Application.Services.Implementations.Project
 
         public async Task<ApiResponse<string>> RemoveProjectMemberAsync(Guid pmId)
         {
-            var projectMember = await _projectMemberRepository.GetByIdAsync(pmId);
-            if (projectMember == null)
+            try
             {
-                return ApiResponse<string>.ErrorResponse(null, "Project member not found");
+                var projectMember = await _projectMemberRepository.GetByIdAsync(pmId);
+                if (projectMember == null)
+                {
+                    return ApiResponse<string>.ErrorResponse(null, "Project member not found");
+                }
+
+                // Check if already left
+                if (projectMember.LeftAt.HasValue)
+                {
+                    return ApiResponse<string>.ErrorResponse(null, "This member has already left the project");
+                }
+
+                var memberId = projectMember.MemberId;
+                var projectId = projectMember.ProjectId;
+
+                // Soft delete: Set LeftAt timestamp
+                projectMember.LeftAt = DateTime.UtcNow;
+                await _projectMemberRepository.UpdateAsync(projectMember);
+                await _projectMemberRepository.SaveChangesAsync();
+
+                // XỬ LÝ TASKS CHƯA HOÀN THÀNH: Unassign các task đang được giao cho member trong project này
+                try
+                {
+                    // Lấy tất cả tasks của member trong project
+                    var projectTasks = await _projectTaskRepository.GetTasksByProjectIdAsync(projectId);
+                    var memberTasks = projectTasks.Where(t => t.UserId == memberId).ToList();
+
+                    // Filter tasks chưa hoàn thành
+                    var incompleteTasks = memberTasks
+                        .Where(t => t.Status != TaskEnum.Done.ToString() && 
+                                   t.Status != TaskEnum.Cancelled.ToString())
+                        .ToList();
+
+                    if (incompleteTasks.Any())
+                    {
+                        var member = await _userManager.FindByIdAsync(memberId.ToString());
+                        var memberName = member?.FullName ?? "Unknown";
+
+                        foreach (var task in incompleteTasks)
+                        {
+                            // Unassign task
+                            task.UserId = null;
+                            task.UpdatedAt = DateTime.UtcNow;
+                            await _projectTaskRepository.UpdateAsync(task);
+
+                            // Notify reviewer if exists
+                            if (task.ReviewerId.HasValue)
+                            {
+                                var notification = new CreateNotificationRequest
+                                {
+                                    UserId = task.ReviewerId.Value,
+                                    Title = "Task Unassigned - Member Left Project",
+                                    Message = $"Task '{task.Title}' has been unassigned because {memberName} left the project.",
+                                    Type = NotificationTypeEnum.TaskUpdate.ToString(),
+                                    EntityId = task.Id.ToString(),
+                                    Data = System.Text.Json.JsonSerializer.Serialize(new
+                                    {
+                                        TaskId = task.Id,
+                                        TaskTitle = task.Title,
+                                        ProjectId = task.ProjectId,
+                                        FormerAssignee = memberName,
+                                        Reason = "MemberLeftProject"
+                                    })
+                                };
+
+                                await _notificationService.CreateInAppNotificationAsync(notification);
+                            }
+                        }
+
+                        await _projectTaskRepository.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the remove operation
+                    Console.WriteLine($"Failed to unassign tasks for removed member {memberId} in project {projectId}: {ex.Message}");
+                }
+
+                return ApiResponse<string>.SuccessResponse("Project member removed successfully");
             }
-
-            await _projectMemberRepository.HardDeleteAsync(projectMember);
-            await _projectMemberRepository.SaveChangesAsync();
-            return ApiResponse<string>.SuccessResponse("Project member removed successfully");
-
+            catch (Exception ex)
+            {
+                return ApiResponse<string>.ErrorResponse(null, $"Error removing project member: {ex.Message}");
+            }
         }
 
         public async Task<ApiResponse<GetProjectResponse>> UpdateProjectAsync(UpdateProjectRequest request)
