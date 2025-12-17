@@ -42,6 +42,9 @@ namespace MSP.Tests.Services.OrganizationServicesTest
             _mockSubscriptionRepository = new Mock<ISubscriptionRepository>();
             _mockPackageRepository = new Mock<IPackageRepository>();
 
+            // Add a mock for IProjectTaskRepository
+            var mockProjectTaskRepository = new Mock<IProjectTaskRepository>();
+
             _userService = new UserService(
                 _mockUserManager.Object,
                 _mockUserRepository.Object,
@@ -49,6 +52,7 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 _mockOrganizationInviteRepository.Object,
                 _mockProjectMemberRepository.Object,
                 _mockProjectRepository.Object,
+                mockProjectTaskRepository.Object, // Pass the mock here
                 _mockSubscriptionRepository.Object,
                 _mockPackageRepository.Object
             );

@@ -22,6 +22,8 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
     {
         private readonly IOrganizationInviteRepository _organizationInviteRepository;
         private readonly IProjectMemberRepository _projectMemberRepository;
+        private readonly IProjectTaskRepository _projectTaskRepository;
+        private readonly IProjectRepository _projectRepository;
         private readonly INotificationService _notificationService;
         private readonly UserManager<User> _userManager;
         private readonly IConfiguration _configuration;
@@ -31,12 +33,16 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
             IOrganizationInviteRepository organizationInviteRepository,
             UserManager<User> userManager,
             IProjectMemberRepository projectMemberRepository,
+            IProjectTaskRepository projectTaskRepository,
+            IProjectRepository projectRepository,
             INotificationService notificationService,
             IConfiguration configuration)
         {
             _organizationInviteRepository = organizationInviteRepository;
             _userManager = userManager;
             _projectMemberRepository = projectMemberRepository;
+            _projectTaskRepository = projectTaskRepository;
+            _projectRepository = projectRepository;
             _notificationService = notificationService;
             _configuration = configuration;
         }
@@ -417,6 +423,55 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                     return ApiResponse<string>.ErrorResponse("Failed to update member information.");
                 }
 
+                // 5.1. CHECK & RE-ACTIVATE FORMER PROJECT MEMBERSHIPS
+                // Nếu member đã từng rời organization, re-activate các project memberships cũ
+                bool isRejoining = false;
+                int reactivatedProjectsCount = 0;
+                try
+                {
+                    // Lấy tất cả projects thuộc business owner này
+                    var boProjects = await _projectRepository.GetProjectsByBOIdAsync(businessOwner.Id);
+                    var projectIds = boProjects.Select(p => p.Id).ToList();
+
+                    if (projectIds.Any())
+                    {
+                        // Lấy các ProjectMember records cũ (có LeftAt)
+                        var allMemberships = await _projectMemberRepository.GetProjectMembersByProjectIdAsync(projectIds.First());
+                        var formerMemberships = new List<ProjectMember>();
+
+                        // Get all former memberships across all projects
+                        foreach (var projectId in projectIds)
+                        {
+                            var memberships = await _projectMemberRepository.GetProjectMembersByProjectIdAsync(projectId);
+                            formerMemberships.AddRange(
+                                memberships.Where(pm => pm.MemberId == memberId && pm.LeftAt.HasValue)
+                            );
+                        }
+
+                        if (formerMemberships.Any())
+                        {
+                            isRejoining = true;
+                            var now = DateTime.UtcNow;
+
+                            foreach (var membership in formerMemberships)
+                            {
+                                // Re-activate by clearing LeftAt
+                                membership.LeftAt = null;
+                                membership.JoinedAt = now; // Update rejoin timestamp
+                                await _projectMemberRepository.UpdateAsync(membership);
+                                reactivatedProjectsCount++;
+                            }
+
+                            await _projectMemberRepository.SaveChangesAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the join operation
+                    Console.WriteLine($"Failed to re-activate project memberships for member {memberId}: {ex.Message}");
+                }
+
                 // 6. Cập nhật invitation hiện tại thành Accepted
                 invitation.Status = InvitationStatus.Accepted;
                 invitation.RespondedAt = DateTime.UtcNow;
@@ -447,12 +502,17 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                 // 8. Send notification to business owner
                 try
                 {
+                    var notificationTitle = isRejoining ? "Member Rejoined" : "Invitation accepted";
+                    var notificationMessage = isRejoining
+                        ? $"{member.FullName} has rejoined {businessOwner.Organization} and been re-added to {reactivatedProjectsCount} project(s)."
+                        : $"{member.FullName} has accepted the invitation and joined {businessOwner.Organization}.";
+
                     var notificationRequest = new CreateNotificationRequest
                     {
                         UserId = businessOwner.Id,
                         ActorId = member.Id,
-                        Title = "Invitation accepted",
-                        Message = $"{member.FullName} has accepted the invitation and joined {businessOwner.Organization}.",
+                        Title = notificationTitle,
+                        Message = notificationMessage,
                         Type = NotificationTypeEnum.InApp.ToString(),
                         EntityId = invitation.Id.ToString(),
                         Data = System.Text.Json.JsonSerializer.Serialize(new
@@ -462,27 +522,40 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                             MemberEmail = member.Email,
                             MemberId = member.Id,
                             OrganizationName = businessOwner.Organization,
-                            EventType = "InvitationAccepted"
+                            EventType = isRejoining ? "MemberRejoined" : "InvitationAccepted",
+                            IsRejoining = isRejoining,
+                            ReactivatedProjectsCount = reactivatedProjectsCount
                         })
                     };
 
                     await _notificationService.CreateInAppNotificationAsync(notificationRequest);
 
                     // Send email notification
+                    var emailSubject = isRejoining ? "Member Rejoined" : "Invitation accepted";
+                    var emailBody = isRejoining
+                        ? $"Hello {businessOwner.FullName},<br/><br/>" +
+                          $"<strong>{member.FullName}</strong> has rejoined <strong>{businessOwner.Organization}</strong> and has been automatically re-added to <strong>{reactivatedProjectsCount}</strong> project(s).<br/><br/>" +
+                          $"You can continue collaborating on existing projects."
+                        : $"Hello {businessOwner.FullName},<br/><br/>" +
+                          $"<strong>{member.FullName}</strong> has accepted the invitation and is now a member of <strong>{businessOwner.Organization}</strong>.<br/><br/>" +
+                          $"You can add them to projects and start collaborating.";
+
                     _notificationService.SendEmailNotification(
                         businessOwner.Email!,
-                        "Invitation accepted",
-                        $"Hello {businessOwner.FullName},<br/><br/>" +
-                        $"<strong>{member.FullName}</strong> has accepted the invitation and is now a member of <strong>{businessOwner.Organization}</strong>.<br/><br/>" +
-                        $"You can add them to projects and start collaborating.");
+                        emailSubject,
+                        emailBody);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Failed to send notification: {ex.Message}");
                 }
 
+                var successMessage = isRejoining
+                    ? $"Welcome back to {businessOwner.Organization}! You have been re-added to {reactivatedProjectsCount} project(s). {otherPendingInvitations.Count} other pending invitation(s) have been canceled."
+                    : $"Successfully joined {businessOwner.Organization}. {otherPendingInvitations.Count} other pending invitation(s) have been canceled.";
+
                 return ApiResponse<string>.SuccessResponse(
-                    $"Successfully joined {businessOwner.Organization}. {otherPendingInvitations.Count} other pending invitation(s) have been canceled.",
+                    successMessage,
                     "Invitation accepted successfully.");
             }
             catch (Exception ex)
@@ -510,7 +583,7 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                 if (!updateResult.Succeeded)
                     return ApiResponse<string>.ErrorResponse("Failed to leave organization.");
 
-                // Sử dụng repository thay vì context
+                // Cập nhật ProjectMember - set LeftAt
                 var activeMemberships = await _projectMemberRepository.GetActiveMembershipsByMemberIdAsync(memberId);
                 var now = DateTime.UtcNow;
                 foreach (var pm in activeMemberships)
@@ -519,6 +592,47 @@ namespace MSP.Application.Services.Implementations.OrganizationInvitation
                 }
                 await _projectMemberRepository.UpdateRangeAsync(activeMemberships);
                 await _projectMemberRepository.SaveChangesAsync();
+
+                // XỬ LÝ TASKS CHƯA HOÀN THÀNH: Unassign các task đang được giao cho member
+                try
+                {
+                    var projectIds = activeMemberships.Select(pm => pm.ProjectId).ToList();
+                    
+                    if (projectIds.Any())
+                    {
+                        // Lấy tất cả tasks của member trong các projects này
+                        var memberTasks = new List<Domain.Entities.ProjectTask>();
+                        foreach (var projectId in projectIds)
+                        {
+                            var tasks = await _projectTaskRepository.GetTasksByProjectIdAsync(projectId);
+                            memberTasks.AddRange(tasks.Where(t => t.UserId == memberId));
+                        }
+
+                        // Filter tasks chưa hoàn thành (không phải Done hoặc Cancelled)
+                        var incompleteTasks = memberTasks
+                            .Where(t => t.Status != TaskEnum.Done.ToString() && 
+                                       t.Status != TaskEnum.Cancelled.ToString())
+                            .ToList();
+
+                        if (incompleteTasks.Any())
+                        {
+                            foreach (var task in incompleteTasks)
+                            {
+                                // Unassign task (set UserId = null)
+                                task.UserId = null;
+                                task.UpdatedAt = now;
+                                await _projectTaskRepository.UpdateAsync(task);
+                            }
+
+                            await _projectTaskRepository.SaveChangesAsync();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the leave operation
+                    Console.WriteLine($"Failed to unassign tasks for member {memberId}: {ex.Message}");
+                }
 
                 return ApiResponse<string>.SuccessResponse(
                     $"You have successfully left {oldOrganization ?? "the organization"}. Project memberships updated ({activeMemberships.Count}).",
