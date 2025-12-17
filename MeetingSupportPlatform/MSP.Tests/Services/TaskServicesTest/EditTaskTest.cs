@@ -21,8 +21,9 @@ namespace MSP.Tests.Services.TaskServicesTest
         private readonly Mock<ITaskHistoryService> _mockTaskHistoryService;
         private readonly Mock<UserManager<User>> _mockUserManager;
         private readonly Mock<INotificationService> _mockNotificationService;
-        private readonly IProjectTaskService _projectTaskService;
         private readonly Mock<IProjectMemberRepository> _mockProjectMemberRepositoryMock;
+        private readonly IProjectTaskService _projectTaskService;
+
         public EditTaskTest()
         {
             _mockProjectTaskRepository = new Mock<IProjectTaskRepository>();
@@ -30,6 +31,7 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockMilestoneRepository = new Mock<IMilestoneRepository>();
             _mockTodoRepository = new Mock<ITodoRepository>();
             _mockTaskHistoryService = new Mock<ITaskHistoryService>();
+            _mockProjectMemberRepositoryMock = new Mock<IProjectMemberRepository>();
             _mockUserManager = new Mock<UserManager<User>>(
                 new Mock<IUserStore<User>>().Object,
                 null, null, null, null, null, null, null, null

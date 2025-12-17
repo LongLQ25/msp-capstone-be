@@ -3,6 +3,7 @@ using Moq;
 using MSP.Application.Models.Requests.Todo;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Todos;
+using MSP.Application.Services.Interfaces.TaskHistory;
 using MSP.Domain.Entities;
 using MSP.Shared.Enums;
 using Xunit;
@@ -15,6 +16,7 @@ namespace MSP.Tests.Services.ToDosServicesTest
         private readonly Mock<ITodoRepository> _mockTodoRepository;
         private readonly Mock<IMeetingRepository> _mockMeetingRepository;
         private readonly Mock<IProjectTaskRepository> _mockProjectTaskRepository;
+        private readonly Mock<ITaskHistoryService> _mockTaskHistoryService;
         private readonly Mock<UserManager<User>> _mockUserManager;
         private readonly ITodoService _todoService;
 
@@ -23,6 +25,7 @@ namespace MSP.Tests.Services.ToDosServicesTest
             _mockTodoRepository = new Mock<ITodoRepository>();
             _mockMeetingRepository = new Mock<IMeetingRepository>();
             _mockProjectTaskRepository = new Mock<IProjectTaskRepository>();
+            _mockTaskHistoryService = new Mock<ITaskHistoryService>();
             _mockUserManager = new Mock<UserManager<User>>(
                 new Mock<IUserStore<User>>().Object,
                 null, null, null, null, null, null, null, null
@@ -32,7 +35,8 @@ namespace MSP.Tests.Services.ToDosServicesTest
                 _mockUserManager.Object,
                 _mockTodoRepository.Object,
                 _mockMeetingRepository.Object,
-                _mockProjectTaskRepository.Object
+                _mockProjectTaskRepository.Object,
+                _mockTaskHistoryService.Object
             );
         }
 

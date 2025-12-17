@@ -31,6 +31,7 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockMilestoneRepository = new Mock<IMilestoneRepository>();
             _mockTodoRepository = new Mock<ITodoRepository>();
             _mockTaskHistoryService = new Mock<ITaskHistoryService>();
+            _mockProjectMemberRepositoryMock = new Mock<IProjectMemberRepository>();
 
             _mockUserManager = new Mock<UserManager<User>>(
                 new Mock<IUserStore<User>>().Object,
