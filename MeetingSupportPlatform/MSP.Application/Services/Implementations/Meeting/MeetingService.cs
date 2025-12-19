@@ -79,7 +79,7 @@ namespace MSP.Application.Services.Implementations.Meeting
                         SenderId = request.CreatedById,
                         RecipientIds = request.AttendeeIds.ToList(),
                         Title = "New Meeting Scheduled",
-                        Message = $"You have been invited to a meeting: {request.Title}. Scheduled at {request.StartTime:MMM dd, yyyy HH:mm}",
+                        Message = $"You have been invited to a meeting: {request.Title}. Scheduled at {request.StartTime.AddHours(7):MMM dd, yyyy HH:mm}",
                         NotificationType = NotificationTypeEnum.MeetingReminder.ToString(),
                         EntityId = meeting.Id.ToString(),
                         Data = System.Text.Json.JsonSerializer.Serialize(new

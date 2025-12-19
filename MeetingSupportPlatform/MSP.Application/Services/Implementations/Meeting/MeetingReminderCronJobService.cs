@@ -5,11 +5,13 @@ using MSP.Application.Repositories;
 using MSP.Application.Services.Interfaces.Notification;
 using MSP.Domain.Entities;
 using MSP.Shared.Enums;
+using System.Text.Json;
 
 namespace MSP.Application.Services.Implementations.Meeting
 {
     /// <summary>
-    /// Service to send meeting reminder notifications 1 hour before meeting starts using Hangfire
+    /// Cron job service to send meeting reminder notifications
+    /// Runs every 10 minutes and sends reminder ~1 hour before meeting starts
     /// </summary>
     public class MeetingReminderCronJobService
     {
@@ -17,6 +19,9 @@ namespace MSP.Application.Services.Implementations.Meeting
         private readonly INotificationService _notificationService;
         private readonly UserManager<User> _userManager;
         private readonly ILogger<MeetingReminderCronJobService> _logger;
+
+        private static readonly TimeZoneInfo VietnamTimeZone =
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
 
         public MeetingReminderCronJobService(
             IMeetingRepository meetingRepository,
@@ -30,146 +35,147 @@ namespace MSP.Application.Services.Implementations.Meeting
             _logger = logger;
         }
 
-        /// <summary>
-        /// Send reminder notifications for meetings starting in 1 hour
-        /// This method will be called by Hangfire Recurring Job every 10-15 minutes
-        /// </summary>
         public async Task SendMeetingRemindersAsync()
         {
             try
             {
-                _logger.LogInformation("Starting to check for upcoming meetings at {Time}", DateTime.UtcNow);
-
-                var now = DateTime.UtcNow;
-                var reminderWindow = now.AddHours(1);
+                var nowUtc = DateTime.UtcNow;
                 int notificationsSent = 0;
 
-                // Get scheduled meetings that will start in approximately 1 hour
-                // Window: between 50 minutes and 70 minutes from now (to handle job frequency)
-                var upcomingMeetings = await _meetingRepository.GetUpcomingMeetingsForReminderAsync(
-                    now.AddMinutes(50),
-                    now.AddMinutes(70),
-                    MeetingEnum.Scheduled.ToString());
+                _logger.LogInformation(
+                    "Checking upcoming meetings for reminder at {TimeUtc}",
+                    nowUtc);
 
-                if (upcomingMeetings.Any())
+                // Window 50–70 minutes (cron runs every 10 minutes)
+                var upcomingMeetings =
+                    await _meetingRepository.GetUpcomingMeetingsForReminderAsync(
+                        nowUtc.AddMinutes(50),
+                        nowUtc.AddMinutes(70),
+                        MeetingEnum.Scheduled.ToString());
+
+                if (!upcomingMeetings.Any())
                 {
-                    _logger.LogInformation("Found {Count} meetings starting in approximately 1 hour", upcomingMeetings.Count());
+                    _logger.LogInformation("No meetings eligible for reminder");
+                    return;
+                }
 
-                    foreach (var meeting in upcomingMeetings)
+                _logger.LogInformation(
+                    "Found {Count} meeting(s) eligible for reminder",
+                    upcomingMeetings.Count());
+
+                foreach (var meeting in upcomingMeetings)
+                {
+                    try
                     {
-                        try
+                        // Meeting time must be UTC
+                        var minutesUntilStart =
+                            (int)(meeting.StartTime - nowUtc).TotalMinutes;
+
+                        var startTimeGmt7 =
+                            TimeZoneInfo.ConvertTimeFromUtc(
+                                meeting.StartTime,
+                                VietnamTimeZone);
+
+                        _logger.LogInformation(
+                            "Processing meeting {MeetingId} ('{Title}') starting in {Minutes} minutes at {StartTimeUtc}",
+                            meeting.Id,
+                            meeting.Title,
+                            minutesUntilStart,
+                            meeting.StartTime);
+
+                        var attendees = meeting.Attendees?.ToList() ?? new List<User>();
+
+                        if (meeting.CreatedBy != null &&
+                            !attendees.Any(a => a.Id == meeting.CreatedById))
                         {
-                            var minutesUntilStart = (int)(meeting.StartTime - now).TotalMinutes;
-                            
-                            _logger.LogInformation(
-                                "Processing reminder for meeting {MeetingId} ('{Title}'). Starts in {Minutes} minutes at {StartTime}",
-                                meeting.Id,
-                                meeting.Title,
-                                minutesUntilStart,
-                                meeting.StartTime);
-
-                            // Get all attendees for this meeting
-                            var attendees = meeting.Attendees?.ToList() ?? new List<User>();
-                            
-                            // Add meeting creator if not already in attendees
-                            if (meeting.CreatedBy != null && !attendees.Any(a => a.Id == meeting.CreatedById))
-                            {
-                                attendees.Add(meeting.CreatedBy);
-                            }
-
-                            if (!attendees.Any())
-                            {
-                                _logger.LogWarning("No attendees found for meeting {MeetingId}", meeting.Id);
-                                continue;
-                            }
-
-                            _logger.LogInformation(
-                                "Sending reminder to {Count} attendee(s) for meeting {MeetingId}",
-                                attendees.Count,
-                                meeting.Id);
-
-                            // Send notification to each attendee
-                            foreach (var attendee in attendees)
-                            {
-                                try
-                                {
-                                    // Send in-app notification
-                                    var notificationRequest = new CreateNotificationRequest
-                                    {
-                                        UserId = attendee.Id,
-                                        Title = "Meeting Reminder",
-                                        Message = $"Meeting '{meeting.Title}' will start in approximately {minutesUntilStart} minutes at {meeting.StartTime:HH:mm}.",
-                                        Type = NotificationTypeEnum.MeetingReminder.ToString(),
-                                        EntityId = meeting.Id.ToString(),
-                                        Data = System.Text.Json.JsonSerializer.Serialize(new
-                                        {
-                                            MeetingId = meeting.Id,
-                                            MeetingTitle = meeting.Title,
-                                            StartTime = meeting.StartTime,
-                                            ProjectId = meeting.ProjectId,
-                                            ProjectName = meeting.Project?.Name,
-                                            MinutesUntilStart = minutesUntilStart,
-                                            EventType = "MeetingReminder"
-                                        })
-                                    };
-
-                                    await _notificationService.CreateInAppNotificationAsync(notificationRequest);
-
-                                    // Send email notification
-                                    if (!string.IsNullOrEmpty(attendee.Email))
-                                    {
-                                        _notificationService.SendEmailNotification(
-                                            attendee.Email,
-                                            "Meeting Reminder",
-                                            $"Hello {attendee.FullName},<br/><br/>" +
-                                            $"This is a reminder that you have an upcoming meeting:<br/><br/>" +
-                                            $"<strong>Meeting:</strong> {meeting.Title}<br/>" +
-                                            $"<strong>Start Time:</strong> {meeting.StartTime:dd/MM/yyyy HH:mm}<br/>" +
-                                            $"<strong>Project:</strong> {meeting.Project?.Name ?? "N/A"}<br/>" +
-                                            (string.IsNullOrEmpty(meeting.Description) ? "" : $"<strong>Description:</strong> {meeting.Description}<br/>") +
-                                            $"<br/>" +
-                                            $"The meeting will start in approximately <strong>{minutesUntilStart} minutes</strong>.<br/><br/>" +
-                                            $"Please be prepared and join on time.");
-                                    }
-
-                                    notificationsSent++;
-
-                                    _logger.LogInformation(
-                                        "Sent meeting reminder to user {UserId} ({Email}) for meeting {MeetingId}",
-                                        attendee.Id,
-                                        attendee.Email,
-                                        meeting.Id);
-                                }
-                                catch (Exception innerEx)
-                                {
-                                    _logger.LogError(innerEx,
-                                        "Failed to send meeting reminder to user {UserId} for meeting {MeetingId}",
-                                        attendee.Id,
-                                        meeting.Id);
-                                    // Continue with other attendees
-                                }
-                            }
+                            attendees.Add(meeting.CreatedBy);
                         }
-                        catch (Exception ex)
+
+                        if (!attendees.Any())
                         {
-                            _logger.LogError(ex,
-                                "Failed to process meeting reminder for meeting {MeetingId}",
+                            _logger.LogWarning(
+                                "Meeting {MeetingId} has no attendees",
                                 meeting.Id);
-                            // Continue processing other meetings
+                            continue;
+                        }
+
+                        foreach (var attendee in attendees)
+                        {
+                            try
+                            {
+                                // ---------- In-app notification ----------
+                                var notificationRequest = new CreateNotificationRequest
+                                {
+                                    UserId = attendee.Id,
+                                    Title = "Meeting Reminder",
+                                    Message =
+                                        $"Meeting '{meeting.Title}' will start in about 1 hour at {startTimeGmt7:HH:mm}.",
+                                    Type = NotificationTypeEnum.MeetingReminder.ToString(),
+                                    EntityId = meeting.Id.ToString(),
+                                    Data = JsonSerializer.Serialize(new
+                                    {
+                                        MeetingId = meeting.Id,
+                                        MeetingTitle = meeting.Title,
+                                        StartTimeUtc = meeting.StartTime,
+                                        ProjectId = meeting.ProjectId,
+                                        ProjectName = meeting.Project?.Name,
+                                        ReminderType = "OneHourReminder"
+                                    })
+                                };
+
+                                await _notificationService
+                                    .CreateInAppNotificationAsync(notificationRequest);
+
+                                // ---------- Email notification ----------
+                                if (!string.IsNullOrWhiteSpace(attendee.Email))
+                                {
+                                    _notificationService.SendEmailNotification(
+                                        attendee.Email,
+                                        "Meeting Reminder",
+                                        $"""
+                                        Hello {attendee.FullName},<br/><br/>
+                                        This is a reminder that you have an upcoming meeting:<br/><br/>
+                                        <strong>Meeting:</strong> {meeting.Title}<br/>
+                                        <strong>Start Time:</strong> {startTimeGmt7:dd/MM/yyyy HH:mm} (GMT+7)<br/>
+                                        <strong>Project:</strong> {meeting.Project?.Name ?? "N/A"}<br/>
+                                        {(string.IsNullOrEmpty(meeting.Description)
+                                            ? ""
+                                            : $"<strong>Description:</strong> {meeting.Description}<br/>")}
+                                        <br/>
+                                        The meeting will start in about <strong>1 hour</strong>.<br/><br/>
+                                        Please be prepared and join on time.
+                                        """);
+                                }
+
+                                notificationsSent++;
+                            }
+                            catch (Exception attendeeEx)
+                            {
+                                _logger.LogError(
+                                    attendeeEx,
+                                    "Failed to send reminder to user {UserId} for meeting {MeetingId}",
+                                    attendee.Id,
+                                    meeting.Id);
+                            }
                         }
                     }
+                    catch (Exception meetingEx)
+                    {
+                        _logger.LogError(
+                            meetingEx,
+                            "Failed to process reminder for meeting {MeetingId}",
+                            meeting.Id);
+                    }
+                }
 
-                    _logger.LogInformation("Successfully sent {Count} meeting reminder notifications", notificationsSent);
-                }
-                else
-                {
-                    _logger.LogInformation("No meetings starting in the next hour");
-                }
+                _logger.LogInformation(
+                    "Meeting reminder job finished. Notifications sent: {Count}",
+                    notificationsSent);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while sending meeting reminders");
-                throw; // Rethrow for Hangfire to retry if needed
+                _logger.LogError(ex, "Meeting reminder cron job failed");
+                throw; // let Hangfire retry
             }
         }
     }
