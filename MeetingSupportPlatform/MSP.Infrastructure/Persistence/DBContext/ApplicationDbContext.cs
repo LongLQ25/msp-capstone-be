@@ -31,6 +31,7 @@ namespace MSP.Infrastructure.Persistence.DBContext
         public DbSet<OrganizationInvitation> OrganizationInvitations { get; set; }
         public DbSet<TaskHistory> TaskHistories { get; set; }
         public DbSet<UserDevice> UserDevices { get; set; }
+        public DbSet<TaskAttachment> TaskAttachments { get; set; }
 
 
 
@@ -334,6 +335,39 @@ namespace MSP.Infrastructure.Persistence.DBContext
 
                 entity.Property(e => e.LastActiveAt)
                     .HasDefaultValueSql("NOW()");
+            });
+
+            // TaskAttachment
+            builder.Entity<TaskAttachment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(a => a.Task)
+                    .WithMany(t => t.Attachments)
+                    .HasForeignKey(a => a.TaskId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(a => a.TaskId)
+                    .HasDatabaseName("IX_TaskAttachments_TaskId");
+
+                entity.Property(a => a.FileName)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                entity.Property(a => a.OriginalFileName)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                entity.Property(a => a.ContentType)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(a => a.FileUrl)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(a => a.FileSize)
+                    .IsRequired();
             });
         }
     }

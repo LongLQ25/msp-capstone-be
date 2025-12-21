@@ -38,7 +38,7 @@ namespace MSP.Infrastructure.Repositories
                 .Include(m => m.CreatedBy)
                 .Include(m => m.Project)
                 .Include(m => m.Milestone)
-                .Where(m => m.ProjectId == projectId)
+                .Where(m => m.ProjectId == projectId && !m.IsDeleted)
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync();
         }
