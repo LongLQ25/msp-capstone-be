@@ -119,5 +119,12 @@ namespace MSP.WebAPI.Controllers
             }
             return Ok(response);
         }
+
+        [HttpGet("by-projectId/{projectId}")]
+        public async Task<IActionResult> GetTasksListByProjectId([FromRoute] Guid projectId)
+        {
+            var response = await _projectTaskService.GetTasksListByProjectIdAsync(projectId);
+            return Ok(response);
+        }
     }
 }

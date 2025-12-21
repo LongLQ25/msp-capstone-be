@@ -72,12 +72,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 // VALIDATION: Kiểm tra user có còn active trong project không
                 var projectMembers = await _projectMemberRepository.GetProjectMembersByProjectIdAsync(request.ProjectId);
                 var userMembership = projectMembers.FirstOrDefault(pm => pm.MemberId == request.UserId.Value);
-                
+
                 if (userMembership == null)
                 {
                     return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User is not a member of this project");
                 }
-                
+
                 if (userMembership.LeftAt.HasValue)
                 {
                     return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Cannot assign task to a user who has left the project");
@@ -503,12 +503,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     var projectMembers = await _projectMemberRepository.GetProjectMembersByProjectIdAsync(task.ProjectId);
                     var userMembership = projectMembers.FirstOrDefault(pm => pm.MemberId == request.UserId.Value);
-                    
+
                     if (userMembership == null)
                     {
                         return ApiResponse<GetTaskResponse>.ErrorResponse(null, "User is not a member of this project");
                     }
-                    
+
                     if (userMembership.LeftAt.HasValue)
                     {
                         return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Cannot assign task to a user who has left the project");
@@ -536,12 +536,12 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 {
                     var projectMembers = await _projectMemberRepository.GetProjectMembersByProjectIdAsync(task.ProjectId);
                     var reviewerMembership = projectMembers.FirstOrDefault(pm => pm.MemberId == request.ReviewerId.Value);
-                    
+
                     if (reviewerMembership == null)
                     {
                         return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Reviewer is not a member of this project");
                     }
-                    
+
                     if (reviewerMembership.LeftAt.HasValue)
                     {
                         return ApiResponse<GetTaskResponse>.ErrorResponse(null, "Cannot assign reviewer who has left the project");
@@ -1018,6 +1018,53 @@ namespace MSP.Application.Services.Implementations.ProjectTask
                 }).ToArray()
             }).ToList();
 
+            return ApiResponse<List<GetTaskResponse>>.SuccessResponse(response, "Tasks retrieved successfully");
+        }
+        public async Task<ApiResponse<List<GetTaskResponse>>> GetTasksListByProjectIdAsync(Guid projectId)
+        {
+            var project = await _projectRepository.GetByIdAsync(projectId);
+            if (project == null || project.IsDeleted)
+            {
+                return ApiResponse<List<GetTaskResponse>>.ErrorResponse(null, "Project not found or has been deleted");
+            }
+            var tasks = await _projectTaskRepository.GetTasksByProjectIdAsync(projectId);
+            tasks ??= new List<Domain.Entities.ProjectTask>();
+            var response = tasks.Select(task => new GetTaskResponse
+            {
+                Id = task.Id,
+                ProjectId = task.ProjectId,
+                UserId = task.UserId,
+                ReviewerId = task.ReviewerId,
+                Title = task.Title,
+                Description = task.Description,
+                Status = task.Status,
+                StartDate = task.StartDate,
+                EndDate = task.EndDate,
+                IsOverdue = task.IsOverdue,
+                CreatedAt = task.CreatedAt,
+                UpdatedAt = task.UpdatedAt,
+                User = task.User == null ? null : new GetUserResponse
+                {
+                    Id = task.User.Id,
+                    Email = task.User.Email,
+                    FullName = task.User.FullName,
+                    AvatarUrl = task.User.AvatarUrl,
+                },
+                Reviewer = task.Reviewer == null ? null : new GetUserResponse
+                {
+                    Id = task.Reviewer.Id,
+                    Email = task.Reviewer.Email,
+                    FullName = task.Reviewer.FullName,
+                    AvatarUrl = task.Reviewer.AvatarUrl,
+                },
+                Milestones = task.Milestones?.Select(m => new GetMilestoneResponse
+                {
+                    Id = m.Id,
+                    ProjectId = m.ProjectId,
+                    Name = m.Name,
+                    DueDate = m.DueDate
+                }).ToArray()
+            }).ToList();
             return ApiResponse<List<GetTaskResponse>>.SuccessResponse(response, "Tasks retrieved successfully");
         }
     }
