@@ -82,9 +82,27 @@ namespace MSP.WebAPI.Controllers
         public async Task<IActionResult> FinishMeeting([FromRoute] Guid meetingId, [FromBody] FinishMeetingRequest request)
         {
             var response = await _meetingService.FinishMeetingAsync(meetingId, request);
+            request.EndTime = DateTime.UtcNow;
             if (!response.Success)
             {
                 _logger.LogError("FinishMeeting failed: {Message}", response.Message);
+                return BadRequest(response);
+            }
+            return Ok(response);
+        }
+
+        [HttpPut("{meetingId}/update-start-time")]
+        public async Task<IActionResult> UpdateMeetingStartTime([FromRoute] Guid meetingId)
+        {
+            var request = new UpdateMeetingRequest
+            {
+                MeetingId = meetingId,
+                StartTime = DateTime.UtcNow,
+            };
+            var response = await _meetingService.UpdateMeetingAsync(request);
+            if (!response.Success)
+            {
+                _logger.LogError("UpdateMeetingStartTime failed: {Message}", response.Message);
                 return BadRequest(response);
             }
             return Ok(response);
