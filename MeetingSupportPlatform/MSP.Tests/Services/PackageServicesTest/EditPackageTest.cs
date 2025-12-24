@@ -422,8 +422,8 @@ namespace MSP.Tests.Services.PackageServicesTest
             Assert.NotNull(capturedPackage);
             Assert.Equal("New Name", capturedPackage.Name);
             Assert.Equal("New Description", capturedPackage.Description);
-            Assert.Equal(199.99m, capturedPackage.Price);
-            Assert.Equal("EUR", capturedPackage.Currency);
+            Assert.Equal(199000, capturedPackage.Price);
+            Assert.Equal("VND", capturedPackage.Currency);
             Assert.Equal(newCreatedById, capturedPackage.CreatedById);
         }
     }

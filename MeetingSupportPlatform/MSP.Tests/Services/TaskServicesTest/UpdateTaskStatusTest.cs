@@ -3,8 +3,8 @@ using Moq;
 using MSP.Application.Models.Requests.ProjectTask;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Implementations.ProjectTask;
-using MSP.Application.Services.Interfaces.ProjectTask;
 using MSP.Application.Services.Interfaces.Notification;
+using MSP.Application.Services.Interfaces.ProjectTask;
 using MSP.Application.Services.Interfaces.TaskHistory;
 using MSP.Domain.Entities;
 using MSP.Shared.Common;
@@ -21,8 +21,9 @@ namespace MSP.Tests.Services.TaskServicesTest
         private readonly Mock<ITaskHistoryService> _mockTaskHistoryService;
         private readonly Mock<UserManager<User>> _mockUserManager;
         private readonly Mock<INotificationService> _mockNotificationService;
+        private readonly Mock<IProjectMemberRepository> _mockProjectMemberRepository;
         private readonly IProjectTaskService _projectTaskService;
-        private readonly Mock<IProjectMemberRepository> _mockProjectMemberRepositoryMock;
+
         public UpdateTaskStatusTest()
         {
             _mockProjectTaskRepository = new Mock<IProjectTaskRepository>();
@@ -35,6 +36,7 @@ namespace MSP.Tests.Services.TaskServicesTest
                 null, null, null, null, null, null, null, null
             );
             _mockNotificationService = new Mock<INotificationService>();
+            _mockProjectMemberRepository = new Mock<IProjectMemberRepository>();
 
             _projectTaskService = new ProjectTaskService(
                 _mockProjectTaskRepository.Object,
@@ -44,13 +46,14 @@ namespace MSP.Tests.Services.TaskServicesTest
                 _mockTodoRepository.Object,
                 _mockTaskHistoryService.Object,
                 _mockNotificationService.Object,
-                _mockProjectMemberRepositoryMock.Object
+                _mockProjectMemberRepository.Object
             );
         }
 
         [Fact]
         public async Task UpdateTaskStatus_ChangeToInProgress_ReturnsSuccessResponse()
         {
+            // Arrange
             var taskId = Guid.NewGuid();
             var projectId = Guid.NewGuid();
             var userId = Guid.NewGuid();
@@ -69,6 +72,14 @@ namespace MSP.Tests.Services.TaskServicesTest
                 IsDeleted = false
             };
 
+            var user = new User
+            {
+                Id = userId,
+                Email = "test@example.com",
+                FullName = "Test User",
+                AvatarUrl = "https://example.com/avatar.jpg"
+            };
+
             var task = new ProjectTask
             {
                 Id = taskId,
@@ -84,12 +95,17 @@ namespace MSP.Tests.Services.TaskServicesTest
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false,
-                User = new User { Id = userId, Email = "test@example.com", FullName = "Test User" },
+                User = user,
                 Reviewer = null,
                 Milestones = new List<Milestone>()
             };
 
-            var actor = new User { Id = actorId, Email = "actor@example.com", FullName = "Actor User" };
+            var actor = new User
+            {
+                Id = actorId,
+                Email = "actor@example.com",
+                FullName = "Actor User"
+            };
 
             var updateRequest = new UpdateTaskRequest
             {
@@ -116,26 +132,41 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockProjectRepository.Setup(x => x.GetByIdAsync(projectId)).ReturnsAsync(project);
             _mockUserManager.Setup(x => x.FindByIdAsync(actorId.ToString())).ReturnsAsync(actor);
             _mockUserManager.Setup(x => x.GetRolesAsync(actor)).ReturnsAsync(new List<string> { "ProjectManager" });
-            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(task.User);
+            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
             _mockProjectTaskRepository.Setup(x => x.CreateExecutionStrategy()).Returns(mockStrategy);
-            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync()).Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
+            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync())
+                .Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
             _mockProjectTaskRepository.Setup(x => x.UpdateAsync(It.IsAny<ProjectTask>())).Returns(Task.CompletedTask);
             _mockProjectTaskRepository.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
-            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>())).ReturnsAsync((TaskHistory)null);
+            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(taskId, "Todo", "InProgress", actorId))
+                .ReturnsAsync((TaskHistory)null);
             _mockNotificationService.Setup(x => x.CreateInAppNotificationAsync(It.IsAny<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>()))
-                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(new MSP.Application.Models.Responses.Notification.NotificationResponse()));
+                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(
+                    new MSP.Application.Models.Responses.Notification.NotificationResponse()));
             _mockNotificationService.Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
+            // Act
             var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
 
+            // Assert
             Assert.NotNull(result);
             Assert.True(result.Success);
+            Assert.NotNull(result.Data);
             Assert.Equal("InProgress", result.Data.Status);
+            Assert.Equal(taskId, result.Data.Id);
+            Assert.Equal("Test Task", result.Data.Title);
+
+            _mockProjectTaskRepository.Verify(x => x.GetTaskByIdAsync(taskId), Times.Once);
+            _mockProjectRepository.Verify(x => x.GetByIdAsync(projectId), Times.Once);
+            _mockTaskHistoryService.Verify(x => x.TrackStatusChangeAsync(taskId, "Todo", "InProgress", actorId), Times.Once);
+            _mockProjectTaskRepository.Verify(x => x.UpdateAsync(It.IsAny<ProjectTask>()), Times.Once);
+            mockTransaction.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
         public async Task UpdateTaskStatus_ChangeToReadyToReview_SendsNotificationToReviewer()
         {
+            // Arrange
             var taskId = Guid.NewGuid();
             var projectId = Guid.NewGuid();
             var userId = Guid.NewGuid();
@@ -155,7 +186,21 @@ namespace MSP.Tests.Services.TaskServicesTest
                 IsDeleted = false
             };
 
-            var reviewer = new User { Id = reviewerId, Email = "reviewer@example.com", FullName = "Reviewer User" };
+            var user = new User
+            {
+                Id = userId,
+                Email = "test@example.com",
+                FullName = "Test User",
+                AvatarUrl = null
+            };
+
+            var reviewer = new User
+            {
+                Id = reviewerId,
+                Email = "reviewer@example.com",
+                FullName = "Reviewer User",
+                AvatarUrl = "https://example.com/reviewer.jpg"
+            };
 
             var task = new ProjectTask
             {
@@ -172,12 +217,17 @@ namespace MSP.Tests.Services.TaskServicesTest
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false,
-                User = new User { Id = userId, Email = "test@example.com", FullName = "Test User" },
+                User = user,
                 Reviewer = reviewer,
                 Milestones = new List<Milestone>()
             };
 
-            var actor = new User { Id = actorId, Email = "actor@example.com", FullName = "Actor User" };
+            var actor = new User
+            {
+                Id = actorId,
+                Email = "actor@example.com",
+                FullName = "Actor User"
+            };
 
             var updateRequest = new UpdateTaskRequest
             {
@@ -204,31 +254,46 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockProjectRepository.Setup(x => x.GetByIdAsync(projectId)).ReturnsAsync(project);
             _mockUserManager.Setup(x => x.FindByIdAsync(actorId.ToString())).ReturnsAsync(actor);
             _mockUserManager.Setup(x => x.GetRolesAsync(actor)).ReturnsAsync(new List<string> { "ProjectManager" });
-            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(task.User);
+            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
             _mockUserManager.Setup(x => x.FindByIdAsync(reviewerId.ToString())).ReturnsAsync(reviewer);
             _mockUserManager.Setup(x => x.GetRolesAsync(reviewer)).ReturnsAsync(new List<string> { "ProjectManager" });
             _mockProjectTaskRepository.Setup(x => x.CreateExecutionStrategy()).Returns(mockStrategy);
-            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync()).Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
+            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync())
+                .Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
             _mockProjectTaskRepository.Setup(x => x.UpdateAsync(It.IsAny<ProjectTask>())).Returns(Task.CompletedTask);
             _mockProjectTaskRepository.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
-            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>())).ReturnsAsync((TaskHistory)null);
+            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(taskId, "InProgress", "ReadyToReview", actorId))
+                .ReturnsAsync((TaskHistory)null);
             _mockNotificationService.Setup(x => x.CreateInAppNotificationAsync(It.IsAny<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>()))
-                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(new MSP.Application.Models.Responses.Notification.NotificationResponse()));
+                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(
+                    new MSP.Application.Models.Responses.Notification.NotificationResponse()));
             _mockNotificationService.Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
+            // Act
             var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
 
+            // Assert
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("ReadyToReview", result.Data.Status);
+
+            _mockTaskHistoryService.Verify(x => x.TrackStatusChangeAsync(taskId, "InProgress", "ReadyToReview", actorId), Times.Once);
             _mockNotificationService.Verify(
-                x => x.CreateInAppNotificationAsync(It.IsAny<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>()),
-                Times.AtLeastOnce);
+                x => x.CreateInAppNotificationAsync(It.Is<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>(
+                    n => n.UserId == reviewerId && n.Title == "Task review request")),
+                Times.Once);
+            _mockNotificationService.Verify(
+                x => x.SendEmailNotification(
+                    reviewer.Email,
+                    "Task review request",
+                    It.IsAny<string>()),
+                Times.Once);
         }
 
         [Fact]
         public async Task UpdateTaskStatus_ChangeToDone_ReturnsSuccessResponse()
         {
+            // Arrange
             var taskId = Guid.NewGuid();
             var projectId = Guid.NewGuid();
             var userId = Guid.NewGuid();
@@ -247,6 +312,14 @@ namespace MSP.Tests.Services.TaskServicesTest
                 IsDeleted = false
             };
 
+            var user = new User
+            {
+                Id = userId,
+                Email = "test@example.com",
+                FullName = "Test User",
+                AvatarUrl = null
+            };
+
             var task = new ProjectTask
             {
                 Id = taskId,
@@ -262,12 +335,17 @@ namespace MSP.Tests.Services.TaskServicesTest
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false,
-                User = new User { Id = userId, Email = "test@example.com", FullName = "Test User" },
+                User = user,
                 Reviewer = null,
                 Milestones = new List<Milestone>()
             };
 
-            var actor = new User { Id = actorId, Email = "actor@example.com", FullName = "Actor User" };
+            var actor = new User
+            {
+                Id = actorId,
+                Email = "actor@example.com",
+                FullName = "Actor User"
+            };
 
             var updateRequest = new UpdateTaskRequest
             {
@@ -294,26 +372,36 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockProjectRepository.Setup(x => x.GetByIdAsync(projectId)).ReturnsAsync(project);
             _mockUserManager.Setup(x => x.FindByIdAsync(actorId.ToString())).ReturnsAsync(actor);
             _mockUserManager.Setup(x => x.GetRolesAsync(actor)).ReturnsAsync(new List<string> { "ProjectManager" });
-            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(task.User);
+            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
             _mockProjectTaskRepository.Setup(x => x.CreateExecutionStrategy()).Returns(mockStrategy);
-            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync()).Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
+            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync())
+                .Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
             _mockProjectTaskRepository.Setup(x => x.UpdateAsync(It.IsAny<ProjectTask>())).Returns(Task.CompletedTask);
             _mockProjectTaskRepository.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
-            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>())).ReturnsAsync((TaskHistory)null);
+            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(taskId, "ReadyToReview", "Done", actorId))
+                .ReturnsAsync((TaskHistory)null);
             _mockNotificationService.Setup(x => x.CreateInAppNotificationAsync(It.IsAny<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>()))
-                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(new MSP.Application.Models.Responses.Notification.NotificationResponse()));
+                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(
+                    new MSP.Application.Models.Responses.Notification.NotificationResponse()));
             _mockNotificationService.Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
+            // Act
             var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
 
+            // Assert
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("Done", result.Data.Status);
+
+            _mockTaskHistoryService.Verify(x => x.TrackStatusChangeAsync(taskId, "ReadyToReview", "Done", actorId), Times.Once);
+            _mockProjectTaskRepository.Verify(x => x.UpdateAsync(It.IsAny<ProjectTask>()), Times.Once);
+            mockTransaction.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
         public async Task UpdateTaskStatus_ChangeToReOpened_SendsNotificationToAssignee()
         {
+            // Arrange
             var taskId = Guid.NewGuid();
             var projectId = Guid.NewGuid();
             var userId = Guid.NewGuid();
@@ -332,6 +420,14 @@ namespace MSP.Tests.Services.TaskServicesTest
                 IsDeleted = false
             };
 
+            var user = new User
+            {
+                Id = userId,
+                Email = "test@example.com",
+                FullName = "Test User",
+                AvatarUrl = null
+            };
+
             var task = new ProjectTask
             {
                 Id = taskId,
@@ -347,12 +443,17 @@ namespace MSP.Tests.Services.TaskServicesTest
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false,
-                User = new User { Id = userId, Email = "test@example.com", FullName = "Test User" },
+                User = user,
                 Reviewer = null,
                 Milestones = new List<Milestone>()
             };
 
-            var actor = new User { Id = actorId, Email = "actor@example.com", FullName = "Actor User" };
+            var actor = new User
+            {
+                Id = actorId,
+                Email = "actor@example.com",
+                FullName = "Actor User"
+            };
 
             var updateRequest = new UpdateTaskRequest
             {
@@ -379,29 +480,44 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockProjectRepository.Setup(x => x.GetByIdAsync(projectId)).ReturnsAsync(project);
             _mockUserManager.Setup(x => x.FindByIdAsync(actorId.ToString())).ReturnsAsync(actor);
             _mockUserManager.Setup(x => x.GetRolesAsync(actor)).ReturnsAsync(new List<string> { "ProjectManager" });
-            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(task.User);
+            _mockUserManager.Setup(x => x.FindByIdAsync(userId.ToString())).ReturnsAsync(user);
             _mockProjectTaskRepository.Setup(x => x.CreateExecutionStrategy()).Returns(mockStrategy);
-            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync()).Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
+            _mockProjectTaskRepository.Setup(x => x.BeginTransactionAsync())
+                .Returns(Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(mockTransaction.Object));
             _mockProjectTaskRepository.Setup(x => x.UpdateAsync(It.IsAny<ProjectTask>())).Returns(Task.CompletedTask);
             _mockProjectTaskRepository.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
-            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>())).ReturnsAsync((TaskHistory)null);
+            _mockTaskHistoryService.Setup(x => x.TrackStatusChangeAsync(taskId, "ReadyToReview", "ReOpened", actorId))
+                .ReturnsAsync((TaskHistory)null);
             _mockNotificationService.Setup(x => x.CreateInAppNotificationAsync(It.IsAny<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>()))
-                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(new MSP.Application.Models.Responses.Notification.NotificationResponse()));
+                .ReturnsAsync(ApiResponse<MSP.Application.Models.Responses.Notification.NotificationResponse>.SuccessResponse(
+                    new MSP.Application.Models.Responses.Notification.NotificationResponse()));
             _mockNotificationService.Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
 
+            // Act
             var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
 
+            // Assert
             Assert.NotNull(result);
             Assert.True(result.Success);
             Assert.Equal("ReOpened", result.Data.Status);
+
+            _mockTaskHistoryService.Verify(x => x.TrackStatusChangeAsync(taskId, "ReadyToReview", "ReOpened", actorId), Times.Once);
             _mockNotificationService.Verify(
-                x => x.CreateInAppNotificationAsync(It.IsAny<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>()),
-                Times.AtLeastOnce);
+                x => x.CreateInAppNotificationAsync(It.Is<MSP.Application.Models.Requests.Notification.CreateNotificationRequest>(
+                    n => n.UserId == userId && n.Title == "Task Reopened")),
+                Times.Once);
+            _mockNotificationService.Verify(
+                x => x.SendEmailNotification(
+                    user.Email,
+                    "Task Reopened",
+                    It.IsAny<string>()),
+                Times.Once);
         }
 
         [Fact]
         public async Task UpdateTaskStatus_InvalidTransition_ReturnsErrorResponse()
         {
+            // Arrange
             var taskId = Guid.NewGuid();
             var projectId = Guid.NewGuid();
             var userId = Guid.NewGuid();
@@ -420,6 +536,14 @@ namespace MSP.Tests.Services.TaskServicesTest
                 IsDeleted = false
             };
 
+            var user = new User
+            {
+                Id = userId,
+                Email = "test@example.com",
+                FullName = "Test User",
+                AvatarUrl = null
+            };
+
             var task = new ProjectTask
             {
                 Id = taskId,
@@ -435,12 +559,17 @@ namespace MSP.Tests.Services.TaskServicesTest
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false,
-                User = new User { Id = userId, Email = "test@example.com", FullName = "Test User" },
+                User = user,
                 Reviewer = null,
                 Milestones = new List<Milestone>()
             };
 
-            var actor = new User { Id = actorId, Email = "actor@example.com", FullName = "Actor User" };
+            var actor = new User
+            {
+                Id = actorId,
+                Email = "actor@example.com",
+                FullName = "Actor User"
+            };
 
             var updateRequest = new UpdateTaskRequest
             {
@@ -461,9 +590,79 @@ namespace MSP.Tests.Services.TaskServicesTest
             _mockUserManager.Setup(x => x.FindByIdAsync(actorId.ToString())).ReturnsAsync(actor);
             _mockUserManager.Setup(x => x.GetRolesAsync(actor)).ReturnsAsync(new List<string> { "ProjectManager" });
 
+            // Act
             var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
 
+            // Assert
             Assert.False(result.Success);
+            Assert.NotNull(result.Message);
+            Assert.Null(result.Data);
+
+            _mockProjectTaskRepository.Verify(x => x.GetTaskByIdAsync(taskId), Times.Once);
+            _mockProjectRepository.Verify(x => x.GetByIdAsync(projectId), Times.Once);
+            _mockProjectTaskRepository.Verify(x => x.UpdateAsync(It.IsAny<ProjectTask>()), Times.Never);
+            _mockTaskHistoryService.Verify(x => x.TrackStatusChangeAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdateTaskStatus_WithNonExistentTask_ReturnsErrorResponse()
+        {
+            // Arrange
+            var taskId = Guid.NewGuid();
+            var actorId = Guid.NewGuid();
+
+            var updateRequest = new UpdateTaskRequest
+            {
+                Id = taskId,
+                Status = "InProgress",
+                ActorId = actorId
+            };
+
+            _mockProjectTaskRepository.Setup(x => x.GetTaskByIdAsync(taskId)).ReturnsAsync((ProjectTask)null);
+
+            // Act
+            var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
+
+            // Assert
+            Assert.False(result.Success);
+            Assert.Equal("Task not found", result.Message);
+            Assert.Null(result.Data);
+        }
+
+        [Fact]
+        public async Task UpdateTaskStatus_WithDeletedTask_ReturnsErrorResponse()
+        {
+            // Arrange
+            var taskId = Guid.NewGuid();
+            var projectId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+            var actorId = Guid.NewGuid();
+
+            var task = new ProjectTask
+            {
+                Id = taskId,
+                ProjectId = projectId,
+                UserId = userId,
+                Title = "Deleted Task",
+                Status = "Todo",
+                IsDeleted = true
+            };
+
+            var updateRequest = new UpdateTaskRequest
+            {
+                Id = taskId,
+                Status = "InProgress",
+                ActorId = actorId
+            };
+
+            _mockProjectTaskRepository.Setup(x => x.GetTaskByIdAsync(taskId)).ReturnsAsync(task);
+
+            // Act
+            var result = await _projectTaskService.UpdateTaskAsync(updateRequest);
+
+            // Assert
+            Assert.False(result.Success);
+            Assert.Equal("Task not found", result.Message);
         }
 
         public class SimpleExecutionStrategy : Microsoft.EntityFrameworkCore.Storage.IExecutionStrategy

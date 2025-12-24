@@ -23,10 +23,14 @@ namespace MSP.Tests.Services.MeetingServicesTest
         {
             _mockMeetingRepository = new Mock<IMeetingRepository>();
             _mockProjectRepository = new Mock<IProjectRepository>();
+
+            // Setup UserManager with proper mock store
+            var mockUserStore = new Mock<IUserStore<User>>();
             _mockUserManager = new Mock<UserManager<User>>(
-                new Mock<IUserStore<User>>().Object,
-                null, null, null, null, null, null, null, null, null
+                mockUserStore.Object,
+                null, null, null, null, null, null, null, null
             );
+
             _mockTodoService = new Mock<ITodoService>();
             _mockNotificationService = new Mock<INotificationService>();
 
@@ -111,9 +115,9 @@ namespace MSP.Tests.Services.MeetingServicesTest
                 .Setup(x => x.GetMeetingByProjectIdAsync(projectId))
                 .ReturnsAsync(meetings);
 
-            _mockUserManager
-                .Setup(x => x.Users)
-                .Returns(new List<User> { user }.AsQueryable());
+            // Setup UserManager.Users to return queryable list
+            var users = new List<User> { user }.AsQueryable();
+            _mockUserManager.Setup(x => x.Users).Returns(users);
 
             // Act
             var result = await _meetingService.GetMeetingsByProjectIdAsync(projectId);
@@ -126,6 +130,9 @@ namespace MSP.Tests.Services.MeetingServicesTest
             Assert.Equal("Meeting 1", result.Data[0].Title);
             Assert.Equal("Meeting 2", result.Data[1].Title);
             Assert.Equal("Meeting 3", result.Data[2].Title);
+
+            // Verify creator email is mapped correctly
+            Assert.All(result.Data, meeting => Assert.Equal("creator@example.com", meeting.CreatedByEmail));
 
             _mockMeetingRepository.Verify(x => x.GetMeetingByProjectIdAsync(projectId), Times.Once);
         }
@@ -185,6 +192,7 @@ namespace MSP.Tests.Services.MeetingServicesTest
                     ProjectId = projectId,
                     Project = project,
                     Title = "Scheduled Meeting",
+                    Description = "Scheduled Description",
                     StartTime = DateTime.UtcNow.AddDays(1),
                     Status = MSP.Shared.Enums.MeetingEnum.Scheduled.ToString(),
                     Attendees = new List<User>()
@@ -197,6 +205,7 @@ namespace MSP.Tests.Services.MeetingServicesTest
                     ProjectId = projectId,
                     Project = project,
                     Title = "Finished Meeting",
+                    Description = "Finished Description",
                     StartTime = DateTime.UtcNow.AddDays(-1),
                     EndTime = DateTime.UtcNow.AddDays(-1).AddHours(1),
                     Status = MSP.Shared.Enums.MeetingEnum.Finished.ToString(),
@@ -210,6 +219,7 @@ namespace MSP.Tests.Services.MeetingServicesTest
                     ProjectId = projectId,
                     Project = project,
                     Title = "Cancelled Meeting",
+                    Description = "Cancelled Description",
                     StartTime = DateTime.UtcNow.AddDays(2),
                     Status = MSP.Shared.Enums.MeetingEnum.Cancelled.ToString(),
                     Attendees = new List<User>()
@@ -220,9 +230,9 @@ namespace MSP.Tests.Services.MeetingServicesTest
                 .Setup(x => x.GetMeetingByProjectIdAsync(projectId))
                 .ReturnsAsync(meetings);
 
-            _mockUserManager
-                .Setup(x => x.Users)
-                .Returns(new List<User> { user }.AsQueryable());
+            // Setup UserManager.Users
+            var users = new List<User> { user }.AsQueryable();
+            _mockUserManager.Setup(x => x.Users).Returns(users);
 
             // Act
             var result = await _meetingService.GetMeetingsByProjectIdAsync(projectId);
@@ -277,6 +287,7 @@ namespace MSP.Tests.Services.MeetingServicesTest
                     ProjectId = projectId,
                     Project = project,
                     Title = "Meeting with Attendees",
+                    Description = "Meeting Description",
                     StartTime = DateTime.UtcNow.AddDays(1),
                     Status = MSP.Shared.Enums.MeetingEnum.Scheduled.ToString(),
                     Attendees = attendees
@@ -287,9 +298,9 @@ namespace MSP.Tests.Services.MeetingServicesTest
                 .Setup(x => x.GetMeetingByProjectIdAsync(projectId))
                 .ReturnsAsync(meetings);
 
-            _mockUserManager
-                .Setup(x => x.Users)
-                .Returns(new List<User> { user }.AsQueryable());
+            // Setup UserManager.Users - include all users
+            var allUsers = new List<User> { user, attendees[0], attendees[1] }.AsQueryable();
+            _mockUserManager.Setup(x => x.Users).Returns(allUsers);
 
             // Act
             var result = await _meetingService.GetMeetingsByProjectIdAsync(projectId);
@@ -306,10 +317,11 @@ namespace MSP.Tests.Services.MeetingServicesTest
             Assert.Equal("avatar1.png", attendee1Response.AvatarUrl);
 
             var attendee2Response = result.Data[0].Attendees.First(a => a.Id == attendeeId2);
+            Assert.Equal("attendee2@example.com", attendee2Response.Email);
+            Assert.Equal("Attendee 2", attendee2Response.FullName);
             Assert.Null(attendee2Response.AvatarUrl);
         }
 
         #endregion
-
     }
 }

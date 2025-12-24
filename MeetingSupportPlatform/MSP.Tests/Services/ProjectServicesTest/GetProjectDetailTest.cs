@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Identity;
 using Moq;
-using MSP.Application.Models.Responses.Project;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Implementations.Project;
 using MSP.Application.Services.Interfaces.Notification;
@@ -59,14 +58,24 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
                 ProjectMembers = new List<ProjectMember>
                 {
                     new ProjectMember
                     {
+                        MemberId = userId,  // PM is also a member
+                        Member = user,
+                        JoinedAt = DateTime.UtcNow,
+                        LeftAt = null  // Active member
+                    },
+                    new ProjectMember
+                    {
+                        MemberId = memberId,
                         Member = member,
-                        JoinedAt = DateTime.UtcNow
+                        JoinedAt = DateTime.UtcNow,
+                        LeftAt = null  // Active member
                     }
                 },
                 ProjectTasks = new List<ProjectTask>
@@ -114,7 +123,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
             Assert.Equal(projectId, result.Data.ProjectId);
             Assert.Equal("Test Project", result.Data.Name);
             Assert.Equal(2, result.Data.Tasks.Count); // PM sees all tasks
-            Assert.Single(result.Data.Members);
+            Assert.Equal(2, result.Data.Members.Count); // Both active members
         }
 
         [Fact]
@@ -138,14 +147,17 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = pm,
                 ProjectMembers = new List<ProjectMember>
                 {
                     new ProjectMember
                     {
+                        MemberId = userId,
                         Member = user,
-                        JoinedAt = DateTime.UtcNow
+                        JoinedAt = DateTime.UtcNow,
+                        LeftAt = null
                     }
                 },
                 ProjectTasks = new List<ProjectTask>
@@ -222,6 +234,54 @@ namespace MSP.Tests.Services.ProjectServicesTest
         }
 
         [Fact]
+        public async Task GetProjectDetail_WithInactiveMember_ReturnsErrorResponse()
+        {
+            // Arrange
+            var projectId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+
+            var user = new User { Id = userId, FullName = "Former Member", Email = "former@test.com" };
+            var owner = new User { Id = ownerId, FullName = "Owner", Email = "owner@test.com" };
+
+            var project = new Domain.Entities.Project
+            {
+                Id = projectId,
+                Name = "Test Project",
+                OwnerId = ownerId,
+                Owner = owner,
+                CreatedBy = owner,
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember
+                    {
+                        MemberId = userId,
+                        Member = user,
+                        JoinedAt = DateTime.UtcNow.AddDays(-30),
+                        LeftAt = DateTime.UtcNow.AddDays(-5)  // Left the project
+                    }
+                },
+                ProjectTasks = new List<ProjectTask>()
+            };
+
+            _userManagerMock.Setup(x => x.FindByIdAsync(userId.ToString()))
+                .ReturnsAsync(user);
+
+            _userManagerMock.Setup(x => x.GetRolesAsync(user))
+                .ReturnsAsync(new List<string> { UserRoleEnum.Member.ToString() });
+
+            _projectRepositoryMock.Setup(x => x.GetProjectDetailWithMemberAsync(projectId, userId))
+                .ReturnsAsync(project);
+
+            // Act
+            var result = await _projectService.GetProjectDetail(projectId, userId);
+
+            // Assert
+            Assert.False(result.Success);
+            Assert.Equal("You are no longer a member of this project", result.Message);
+        }
+
+        [Fact]
         public async Task GetProjectDetail_WithOverdueTasks_MarksThemCorrectly()
         {
             // Arrange
@@ -240,9 +300,13 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
-                ProjectMembers = new List<ProjectMember>(),
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = userId, Member = user, LeftAt = null }
+                },
                 ProjectTasks = new List<ProjectTask>
                 {
                     new ProjectTask
@@ -325,9 +389,13 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
-                ProjectMembers = new List<ProjectMember>(),
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = userId, Member = user, LeftAt = null }
+                },
                 ProjectTasks = new List<ProjectTask>()
             };
 
@@ -368,6 +436,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
                 ProjectMembers = new List<ProjectMember>(),
@@ -387,9 +456,8 @@ namespace MSP.Tests.Services.ProjectServicesTest
             var result = await _projectService.GetProjectDetail(projectId, userId);
 
             // Assert
-            Assert.True(result.Success);
-            Assert.NotNull(result.Data);
-            Assert.Empty(result.Data.Members);
+            Assert.False(result.Success);
+            Assert.Equal("You are no longer a member of this project", result.Message);
         }
 
         [Fact]
@@ -411,9 +479,13 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
-                ProjectMembers = new List<ProjectMember>(),
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = userId, Member = user, LeftAt = null }
+                },
                 ProjectTasks = new List<ProjectTask>
                 {
                     new ProjectTask
@@ -450,7 +522,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
         }
 
         [Fact]
-        public async Task GetProjectDetail_WithMultipleMembers_ReturnsAllMembers()
+        public async Task GetProjectDetail_WithMultipleMembers_ReturnsAllActiveMembers()
         {
             // Arrange
             var projectId = Guid.NewGuid();
@@ -474,13 +546,15 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
                 ProjectMembers = new List<ProjectMember>
                 {
-                    new ProjectMember { Member = member1, JoinedAt = DateTime.UtcNow },
-                    new ProjectMember { Member = member2, JoinedAt = DateTime.UtcNow },
-                    new ProjectMember { Member = member3, JoinedAt = DateTime.UtcNow }
+                    new ProjectMember { MemberId = userId, Member = user, JoinedAt = DateTime.UtcNow, LeftAt = null },
+                    new ProjectMember { MemberId = member1Id, Member = member1, JoinedAt = DateTime.UtcNow, LeftAt = null },
+                    new ProjectMember { MemberId = member2Id, Member = member2, JoinedAt = DateTime.UtcNow, LeftAt = null },
+                    new ProjectMember { MemberId = member3Id, Member = member3, JoinedAt = DateTime.UtcNow, LeftAt = DateTime.UtcNow } // Inactive
                 },
                 ProjectTasks = new List<ProjectTask>()
             };
@@ -500,10 +574,11 @@ namespace MSP.Tests.Services.ProjectServicesTest
             // Assert
             Assert.True(result.Success);
             Assert.NotNull(result.Data);
-            Assert.Equal(3, result.Data.Members.Count);
+            Assert.Equal(3, result.Data.Members.Count); // Only active members
+            Assert.Contains(result.Data.Members, m => m.FullName == "Project Manager");
             Assert.Contains(result.Data.Members, m => m.FullName == "Member 1");
             Assert.Contains(result.Data.Members, m => m.FullName == "Member 2");
-            Assert.Contains(result.Data.Members, m => m.FullName == "Member 3");
+            Assert.DoesNotContain(result.Data.Members, m => m.FullName == "Member 3"); // Inactive member excluded
         }
 
         [Fact]
@@ -525,9 +600,13 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
-                ProjectMembers = new List<ProjectMember>(),
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = userId, Member = user, LeftAt = null }
+                },
                 ProjectTasks = new List<ProjectTask>()
             };
 
@@ -570,9 +649,13 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddDays(30),
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = pm,
-                ProjectMembers = new List<ProjectMember>(),
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = userId, Member = user, LeftAt = null }
+                },
                 ProjectTasks = new List<ProjectTask>()
             };
 
@@ -604,17 +687,17 @@ namespace MSP.Tests.Services.ProjectServicesTest
             var startDate = DateTime.UtcNow;
             var endDate = DateTime.UtcNow.AddDays(30);
 
-            var user = new User 
-            { 
-                Id = userId, 
-                FullName = "Project Manager", 
+            var user = new User
+            {
+                Id = userId,
+                FullName = "Project Manager",
                 Email = "pm@test.com",
                 AvatarUrl = "pm-avatar.jpg"
             };
-            var owner = new User 
-            { 
-                Id = ownerId, 
-                FullName = "Owner", 
+            var owner = new User
+            {
+                Id = ownerId,
+                FullName = "Owner",
                 Email = "owner@test.com",
                 AvatarUrl = "owner-avatar.jpg"
             };
@@ -627,9 +710,13 @@ namespace MSP.Tests.Services.ProjectServicesTest
                 StartDate = startDate,
                 EndDate = endDate,
                 Status = "InProgress",
+                OwnerId = ownerId,
                 Owner = owner,
                 CreatedBy = user,
-                ProjectMembers = new List<ProjectMember>(),
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = userId, Member = user, LeftAt = null }
+                },
                 ProjectTasks = new List<ProjectTask>()
             };
 
@@ -654,7 +741,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
             Assert.Equal(startDate, result.Data.StartDate);
             Assert.Equal(endDate, result.Data.EndDate);
             Assert.Equal("InProgress", result.Data.Status);
-            
+
             // Verify Owner mapping
             Assert.Equal(ownerId, result.Data.Owner.UserId);
             Assert.Equal("Owner", result.Data.Owner.FullName);
@@ -666,6 +753,49 @@ namespace MSP.Tests.Services.ProjectServicesTest
             Assert.Equal("Project Manager", result.Data.ProjectManager.FullName);
             Assert.Equal("pm@test.com", result.Data.ProjectManager.Email);
             Assert.Equal("pm-avatar.jpg", result.Data.ProjectManager.AvatarUrl);
+        }
+
+        [Fact]
+        public async Task GetProjectDetail_AsOwner_CanViewEvenIfNotMember()
+        {
+            // Arrange
+            var projectId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var pmId = Guid.NewGuid();
+
+            var owner = new User { Id = ownerId, FullName = "Owner", Email = "owner@test.com" };
+            var pm = new User { Id = pmId, FullName = "PM", Email = "pm@test.com" };
+
+            var project = new Domain.Entities.Project
+            {
+                Id = projectId,
+                Name = "Test Project",
+                OwnerId = ownerId,
+                Owner = owner,
+                CreatedBy = pm,
+                ProjectMembers = new List<ProjectMember>
+                {
+                    new ProjectMember { MemberId = pmId, Member = pm, LeftAt = null }
+                },
+                ProjectTasks = new List<ProjectTask>()
+            };
+
+            _userManagerMock.Setup(x => x.FindByIdAsync(ownerId.ToString()))
+                .ReturnsAsync(owner);
+
+            _userManagerMock.Setup(x => x.GetRolesAsync(owner))
+                .ReturnsAsync(new List<string> { UserRoleEnum.BusinessOwner.ToString() });
+
+            _projectRepositoryMock.Setup(x => x.GetProjectDetailWithMemberAsync(projectId, ownerId))
+                .ReturnsAsync(project);
+
+            // Act
+            var result = await _projectService.GetProjectDetail(projectId, ownerId);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.NotNull(result.Data);
+            Assert.Equal(projectId, result.Data.ProjectId);
         }
     }
 }

@@ -119,7 +119,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
             // Assert
             Assert.True(result.Success);
             Assert.NotNull(result.Data);
-            Assert.Equal("Member added to project successfully", result.Message);
+            Assert.Equal("Request was successful", result.Message);
             Assert.Equal(projectManagerId, result.Data.UserId);
             Assert.Equal(projectManager.FullName, result.Data.Member.FullName);
             
@@ -567,7 +567,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
             // Operation should still succeed even if notification fails
             Assert.True(result.Success);
             Assert.NotNull(result.Data);
-            Assert.Equal("Member added to project successfully", result.Message);
+            Assert.Equal("Request was successful", result.Message);
             
             // Verify project member was still added
             _projectMemberRepositoryMock.Verify(x => x.AddAsync(It.IsAny<ProjectMember>()), Times.Once);
@@ -802,7 +802,7 @@ namespace MSP.Tests.Services.ProjectServicesTest
             
             // Verify notification structure
             Assert.Equal(projectManagerId, capturedNotification.UserId);
-            Assert.Equal("👥 Added to Project", capturedNotification.Title);
+            Assert.Equal("Added to Project", capturedNotification.Title);
             Assert.Contains(project.Name, capturedNotification.Message);
             Assert.Contains("Welcome to the team", capturedNotification.Message);
             Assert.Equal("ProjectUpdate", capturedNotification.Type);

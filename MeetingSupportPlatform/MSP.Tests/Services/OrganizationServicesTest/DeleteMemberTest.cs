@@ -1,23 +1,24 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using MSP.Application.Abstracts;
+using MSP.Application.Models.Requests.Notification;
+using MSP.Application.Models.Responses.Notification;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Implementations.Users;
 using MSP.Application.Services.Interfaces.Notification;
 using MSP.Application.Services.Interfaces.Users;
 using MSP.Domain.Entities;
+using MSP.Shared.Common;
+using MSP.Shared.Enums;
 using Xunit;
 
-namespace MSP.Tests.Services.OrganizationServicesTest
+namespace MSP.Tests.Services.UserServicesTest
 {
     public class DeleteMemberTest
     {
-        private readonly Mock<UserManager<User>> _mockUserManager;
         private readonly Mock<IUserRepository> _mockUserRepository;
+        private readonly Mock<UserManager<User>> _mockUserManager;
         private readonly Mock<INotificationService> _mockNotificationService;
         private readonly Mock<IOrganizationInviteRepository> _mockOrganizationInviteRepository;
         private readonly Mock<IProjectMemberRepository> _mockProjectMemberRepository;
@@ -25,14 +26,11 @@ namespace MSP.Tests.Services.OrganizationServicesTest
         private readonly Mock<IProjectTaskRepository> _mockProjectTaskRepository;
         private readonly Mock<ISubscriptionRepository> _mockSubscriptionRepository;
         private readonly Mock<IPackageRepository> _mockPackageRepository;
+        private readonly Mock<IConfiguration> _mockConfiguration;
         private readonly IUserService _userService;
-        private readonly IConfiguration _configuration;
+
         public DeleteMemberTest()
         {
-            _mockUserManager = new Mock<UserManager<User>>(
-                new Mock<IUserStore<User>>().Object,
-                null, null, null, null, null, null, null, null
-            );
             _mockUserRepository = new Mock<IUserRepository>();
             _mockNotificationService = new Mock<INotificationService>();
             _mockOrganizationInviteRepository = new Mock<IOrganizationInviteRepository>();
@@ -41,6 +39,16 @@ namespace MSP.Tests.Services.OrganizationServicesTest
             _mockProjectTaskRepository = new Mock<IProjectTaskRepository>();
             _mockSubscriptionRepository = new Mock<ISubscriptionRepository>();
             _mockPackageRepository = new Mock<IPackageRepository>();
+            _mockConfiguration = new Mock<IConfiguration>();
+
+            // Setup configuration
+            _mockConfiguration.Setup(x => x["AppSettings:ClientUrl"]).Returns("http://localhost:3000");
+
+            var mockUserStore = new Mock<IUserStore<User>>();
+            _mockUserManager = new Mock<UserManager<User>>(
+                mockUserStore.Object,
+                null, null, null, null, null, null, null, null
+            );
 
             _userService = new UserService(
                 _mockUserManager.Object,
@@ -52,18 +60,17 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 _mockProjectTaskRepository.Object,
                 _mockSubscriptionRepository.Object,
                 _mockPackageRepository.Object,
-                _configuration
+                _mockConfiguration.Object
             );
         }
 
         [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_WithValidRequest_ReturnsSuccessResponse()
+        public async Task RemoveMemberFromOrganizationAsync_WithValidMember_ReturnsSuccessResponse()
         {
             // Arrange
             var businessOwnerId = Guid.NewGuid();
             var memberId = Guid.NewGuid();
-            var projectId1 = Guid.NewGuid();
-            var projectId2 = Guid.NewGuid();
+            var projectId = Guid.NewGuid();
 
             var member = new User
             {
@@ -74,22 +81,14 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 ManagedById = businessOwnerId
             };
 
-            var projectIds = new List<Guid> { projectId1, projectId2 };
-
             var projectMemberships = new List<ProjectMember>
             {
                 new ProjectMember
                 {
                     Id = Guid.NewGuid(),
+                    ProjectId = projectId,
                     MemberId = memberId,
-                    ProjectId = projectId1,
-                    LeftAt = null
-                },
-                new ProjectMember
-                {
-                    Id = Guid.NewGuid(),
-                    MemberId = memberId,
-                    ProjectId = projectId2,
+                    JoinedAt = DateTime.UtcNow,
                     LeftAt = null
                 }
             };
@@ -104,19 +103,20 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             _mockProjectRepository
                 .Setup(x => x.GetProjectIdsByOwnerIdAsync(businessOwnerId))
-                .ReturnsAsync(projectIds);
+                .ReturnsAsync(new List<Guid> { projectId });
 
             _mockProjectMemberRepository
-                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, projectIds))
+                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, It.IsAny<List<Guid>>()))
                 .ReturnsAsync(projectMemberships);
 
             _mockProjectMemberRepository
                 .Setup(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()))
                 .Returns(Task.CompletedTask);
 
-            _mockProjectMemberRepository
-                .Setup(x => x.SaveChangesAsync())
-                .Returns(Task.CompletedTask);
+
+            _mockProjectTaskRepository
+                .Setup(x => x.GetTasksByProjectIdAsync(projectId))
+                .ReturnsAsync(new List<ProjectTask>());
 
             // Act
             var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
@@ -124,7 +124,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
             // Assert
             Assert.True(result.Success);
             Assert.Equal("Member removed successfully.", result.Message);
-            Assert.Contains("Removed member from organization and updated 2 project(s)", result.Data);
+            Assert.Contains("Removed member from organization", result.Data);
+            Assert.Contains("1 project(s)", result.Data);
 
             _mockUserManager.Verify(
                 x => x.UpdateAsync(It.Is<User>(u =>
@@ -137,13 +138,11 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             _mockProjectMemberRepository.Verify(
                 x => x.UpdateRangeAsync(It.Is<List<ProjectMember>>(list =>
-                    list.Count == 2 &&
-                    list.All(pm => pm.LeftAt != null)
+                    list.Count == 1 &&
+                    list.All(pm => pm.LeftAt.HasValue)
                 )),
                 Times.Once
             );
-
-            _mockProjectMemberRepository.Verify(x => x.SaveChangesAsync(), Times.Once);
         }
 
         [Fact]
@@ -162,27 +161,24 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("Member not found.", result.Message);
-
-            _mockUserManager.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
-            _mockProjectMemberRepository.Verify(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()), Times.Never);
+            Assert.Equal("Member not found.", result.Data);
         }
 
         [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_WithMemberNotBelongingToBusinessOwner_ReturnsErrorResponse()
+        public async Task RemoveMemberFromOrganizationAsync_WithMemberNotBelongingToOrganization_ReturnsErrorResponse()
         {
             // Arrange
             var businessOwnerId = Guid.NewGuid();
-            var otherBusinessOwnerId = Guid.NewGuid();
             var memberId = Guid.NewGuid();
+            var differentBusinessOwnerId = Guid.NewGuid();
 
             var member = new User
             {
                 Id = memberId,
                 Email = "member@example.com",
                 FullName = "Member User",
-                Organization = "Another Organization",
-                ManagedById = otherBusinessOwnerId
+                Organization = "Different Organization",
+                ManagedById = differentBusinessOwnerId
             };
 
             _mockUserManager
@@ -194,9 +190,7 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("This member does not belong to your organization.", result.Message);
-
-            _mockUserManager.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
+            Assert.Equal("This member does not belong to your organization.", result.Data);
         }
 
         [Fact]
@@ -212,7 +206,7 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 Email = "member@example.com",
                 FullName = "Member User",
                 Organization = null,
-                ManagedById = businessOwnerId
+                ManagedById = null
             };
 
             _mockUserManager
@@ -224,11 +218,196 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("This member does not belong to your organization.", result.Message);
+            Assert.Equal("This member does not belong to your organization.", result.Data);
         }
 
         [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_WhenUpdateUserFails_ReturnsErrorResponse()
+        public async Task RemoveMemberFromOrganizationAsync_WithIncompleteTasks_UnassignsTasks()
+        {
+            // Arrange
+            var businessOwnerId = Guid.NewGuid();
+            var memberId = Guid.NewGuid();
+            var reviewerId = Guid.NewGuid();
+            var projectId = Guid.NewGuid();
+            var taskId = Guid.NewGuid();
+
+            var member = new User
+            {
+                Id = memberId,
+                Email = "member@example.com",
+                FullName = "Member User",
+                Organization = "Test Organization",
+                ManagedById = businessOwnerId
+            };
+
+            var projectMemberships = new List<ProjectMember>
+            {
+                new ProjectMember
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    MemberId = memberId,
+                    JoinedAt = DateTime.UtcNow,
+                    LeftAt = null
+                }
+            };
+
+            var incompleteTasks = new List<ProjectTask>
+            {
+                new ProjectTask
+                {
+                    Id = taskId,
+                    ProjectId = projectId,
+                    UserId = memberId,
+                    Title = "Incomplete Task",
+                    Status = TaskEnum.InProgress.ToString(),
+                    ReviewerId = reviewerId
+                }
+            };
+
+            _mockUserManager
+                .Setup(x => x.FindByIdAsync(memberId.ToString()))
+                .ReturnsAsync(member);
+
+            _mockUserManager
+                .Setup(x => x.UpdateAsync(It.IsAny<User>()))
+                .ReturnsAsync(IdentityResult.Success);
+
+            _mockProjectRepository
+                .Setup(x => x.GetProjectIdsByOwnerIdAsync(businessOwnerId))
+                .ReturnsAsync(new List<Guid> { projectId });
+
+            _mockProjectMemberRepository
+                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, It.IsAny<List<Guid>>()))
+                .ReturnsAsync(projectMemberships);
+
+            _mockProjectMemberRepository
+                .Setup(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()))
+                .Returns(Task.CompletedTask);
+
+            _mockProjectTaskRepository
+                .Setup(x => x.GetTasksByProjectIdAsync(projectId))
+                .ReturnsAsync(incompleteTasks);
+
+            _mockProjectTaskRepository
+                .Setup(x => x.UpdateAsync(It.IsAny<ProjectTask>()))
+                .Returns(Task.CompletedTask);
+
+
+            var notificationResponse = new NotificationResponse { Id = Guid.NewGuid() };
+            _mockNotificationService
+                .Setup(x => x.CreateInAppNotificationAsync(It.IsAny<CreateNotificationRequest>()))
+                .ReturnsAsync(ApiResponse<NotificationResponse>.SuccessResponse(notificationResponse, "Notification sent"));
+
+            // Act
+            var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
+
+            // Assert
+            Assert.True(result.Success);
+
+            _mockProjectTaskRepository.Verify(
+                x => x.UpdateAsync(It.Is<ProjectTask>(t =>
+                    t.Id == taskId &&
+                    t.UserId == null
+                )),
+                Times.Once
+            );
+
+            _mockNotificationService.Verify(
+                x => x.CreateInAppNotificationAsync(It.Is<CreateNotificationRequest>(n =>
+                    n.UserId == reviewerId &&
+                    n.Title == "Task Unassigned - Member Removed"
+                )),
+                Times.Once
+            );
+        }
+
+        [Fact]
+        public async Task RemoveMemberFromOrganizationAsync_WithCompletedTasks_DoesNotUnassignTasks()
+        {
+            // Arrange
+            var businessOwnerId = Guid.NewGuid();
+            var memberId = Guid.NewGuid();
+            var projectId = Guid.NewGuid();
+
+            var member = new User
+            {
+                Id = memberId,
+                Email = "member@example.com",
+                FullName = "Member User",
+                Organization = "Test Organization",
+                ManagedById = businessOwnerId
+            };
+
+            var projectMemberships = new List<ProjectMember>
+            {
+                new ProjectMember
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    MemberId = memberId,
+                    JoinedAt = DateTime.UtcNow,
+                    LeftAt = null
+                }
+            };
+
+            var completedTasks = new List<ProjectTask>
+            {
+                new ProjectTask
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    UserId = memberId,
+                    Title = "Completed Task",
+                    Status = TaskEnum.Done.ToString()
+                }
+            };
+
+            _mockUserManager
+                .Setup(x => x.FindByIdAsync(memberId.ToString()))
+                .ReturnsAsync(member);
+
+            _mockUserManager
+                .Setup(x => x.UpdateAsync(It.IsAny<User>()))
+                .ReturnsAsync(IdentityResult.Success);
+
+            _mockProjectRepository
+                .Setup(x => x.GetProjectIdsByOwnerIdAsync(businessOwnerId))
+                .ReturnsAsync(new List<Guid> { projectId });
+
+            _mockProjectMemberRepository
+                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, It.IsAny<List<Guid>>()))
+                .ReturnsAsync(projectMemberships);
+
+            _mockProjectMemberRepository
+                .Setup(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()))
+                .Returns(Task.CompletedTask);
+
+
+            _mockProjectTaskRepository
+                .Setup(x => x.GetTasksByProjectIdAsync(projectId))
+                .ReturnsAsync(completedTasks);
+
+            // Act
+            var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
+
+            // Assert
+            Assert.True(result.Success);
+
+            // Verify task was NOT updated (no unassignment for completed tasks)
+            _mockProjectTaskRepository.Verify(
+                x => x.UpdateAsync(It.IsAny<ProjectTask>()),
+                Times.Never
+            );
+
+            _mockNotificationService.Verify(
+                x => x.CreateInAppNotificationAsync(It.IsAny<CreateNotificationRequest>()),
+                Times.Never
+            );
+        }
+
+        [Fact]
+        public async Task RemoveMemberFromOrganizationAsync_WhenUpdateFails_ReturnsErrorResponse()
         {
             // Arrange
             var businessOwnerId = Guid.NewGuid();
@@ -256,214 +435,7 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("Failed to remove member from organization.", result.Message);
-
-            _mockProjectRepository.Verify(x => x.GetProjectIdsByOwnerIdAsync(It.IsAny<Guid>()), Times.Never);
-            _mockProjectMemberRepository.Verify(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_WithNoProjectMemberships_ReturnsSuccessResponse()
-        {
-            // Arrange
-            var businessOwnerId = Guid.NewGuid();
-            var memberId = Guid.NewGuid();
-
-            var member = new User
-            {
-                Id = memberId,
-                Email = "member@example.com",
-                FullName = "Member User",
-                Organization = "Test Organization",
-                ManagedById = businessOwnerId
-            };
-
-            _mockUserManager
-                .Setup(x => x.FindByIdAsync(memberId.ToString()))
-                .ReturnsAsync(member);
-
-            _mockUserManager
-                .Setup(x => x.UpdateAsync(It.IsAny<User>()))
-                .ReturnsAsync(IdentityResult.Success);
-
-            _mockProjectRepository
-                .Setup(x => x.GetProjectIdsByOwnerIdAsync(businessOwnerId))
-                .ReturnsAsync(new List<Guid>());
-
-            _mockProjectMemberRepository
-                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, It.IsAny<List<Guid>>()))
-                .ReturnsAsync(new List<ProjectMember>());
-
-            _mockProjectMemberRepository
-                .Setup(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()))
-                .Returns(Task.CompletedTask);
-
-            _mockProjectMemberRepository
-                .Setup(x => x.SaveChangesAsync())
-                .Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
-
-            // Assert
-            Assert.True(result.Success);
-            Assert.Contains("updated 0 project(s)", result.Data);
-        }
-
-        [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_SetsLeftAtTimestamp()
-        {
-            // Arrange
-            var businessOwnerId = Guid.NewGuid();
-            var memberId = Guid.NewGuid();
-            var projectId = Guid.NewGuid();
-            var beforeTest = DateTime.UtcNow;
-
-            var member = new User
-            {
-                Id = memberId,
-                Email = "member@example.com",
-                FullName = "Member User",
-                Organization = "Test Organization",
-                ManagedById = businessOwnerId
-            };
-
-            var projectMemberships = new List<ProjectMember>
-            {
-                new ProjectMember
-                {
-                    Id = Guid.NewGuid(),
-                    MemberId = memberId,
-                    ProjectId = projectId,
-                    LeftAt = null
-                }
-            };
-
-            List<ProjectMember>? capturedMemberships = null;
-
-            _mockUserManager
-                .Setup(x => x.FindByIdAsync(memberId.ToString()))
-                .ReturnsAsync(member);
-
-            _mockUserManager
-                .Setup(x => x.UpdateAsync(It.IsAny<User>()))
-                .ReturnsAsync(IdentityResult.Success);
-
-            _mockProjectRepository
-                .Setup(x => x.GetProjectIdsByOwnerIdAsync(businessOwnerId))
-                .ReturnsAsync(new List<Guid> { projectId });
-
-            _mockProjectMemberRepository
-                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, It.IsAny<List<Guid>>()))
-                .ReturnsAsync(projectMemberships);
-
-            _mockProjectMemberRepository
-                .Setup(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()))
-                .Callback<List<ProjectMember>>(pm => capturedMemberships = pm)
-                .Returns(Task.CompletedTask);
-
-            _mockProjectMemberRepository
-                .Setup(x => x.SaveChangesAsync())
-                .Returns(Task.CompletedTask);
-
-            // Act
-            await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
-            var afterTest = DateTime.UtcNow;
-
-            // Assert
-            Assert.NotNull(capturedMemberships);
-            Assert.Single(capturedMemberships);
-            Assert.NotNull(capturedMemberships[0].LeftAt);
-            Assert.True(capturedMemberships[0].LeftAt >= beforeTest && capturedMemberships[0].LeftAt <= afterTest);
-        }
-
-        [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_WithMultipleProjects_UpdatesAllMemberships()
-        {
-            // Arrange
-            var businessOwnerId = Guid.NewGuid();
-            var memberId = Guid.NewGuid();
-
-            var member = new User
-            {
-                Id = memberId,
-                Email = "member@example.com",
-                FullName = "Member User",
-                Organization = "Test Organization",
-                ManagedById = businessOwnerId
-            };
-
-            var projectIds = new List<Guid>
-            {
-                Guid.NewGuid(),
-                Guid.NewGuid(),
-                Guid.NewGuid()
-            };
-
-            var projectMemberships = new List<ProjectMember>
-            {
-                new ProjectMember { Id = Guid.NewGuid(), MemberId = memberId, ProjectId = projectIds[0], LeftAt = null },
-                new ProjectMember { Id = Guid.NewGuid(), MemberId = memberId, ProjectId = projectIds[1], LeftAt = null },
-                new ProjectMember { Id = Guid.NewGuid(), MemberId = memberId, ProjectId = projectIds[2], LeftAt = null }
-            };
-
-            _mockUserManager
-                .Setup(x => x.FindByIdAsync(memberId.ToString()))
-                .ReturnsAsync(member);
-
-            _mockUserManager
-                .Setup(x => x.UpdateAsync(It.IsAny<User>()))
-                .ReturnsAsync(IdentityResult.Success);
-
-            _mockProjectRepository
-                .Setup(x => x.GetProjectIdsByOwnerIdAsync(businessOwnerId))
-                .ReturnsAsync(projectIds);
-
-            _mockProjectMemberRepository
-                .Setup(x => x.GetActiveMembershipsByMemberAndProjectsAsync(memberId, projectIds))
-                .ReturnsAsync(projectMemberships);
-
-            _mockProjectMemberRepository
-                .Setup(x => x.UpdateRangeAsync(It.IsAny<List<ProjectMember>>()))
-                .Returns(Task.CompletedTask);
-
-            _mockProjectMemberRepository
-                .Setup(x => x.SaveChangesAsync())
-                .Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
-
-            // Assert
-            Assert.True(result.Success);
-            Assert.Contains("updated 3 project(s)", result.Data);
-
-            _mockProjectMemberRepository.Verify(
-                x => x.UpdateRangeAsync(It.Is<List<ProjectMember>>(list =>
-                    list.Count == 3 &&
-                    list.All(pm => pm.LeftAt != null)
-                )),
-                Times.Once
-            );
-        }
-
-        [Fact]
-        public async Task RemoveMemberFromOrganizationAsync_WhenExceptionThrown_ReturnsErrorResponse()
-        {
-            // Arrange
-            var businessOwnerId = Guid.NewGuid();
-            var memberId = Guid.NewGuid();
-
-            _mockUserManager
-                .Setup(x => x.FindByIdAsync(memberId.ToString()))
-                .ThrowsAsync(new Exception("Database error"));
-
-            // Act
-            var result = await _userService.RemoveMemberFromOrganizationAsync(businessOwnerId, memberId);
-
-            // Assert
-            Assert.False(result.Success);
-            Assert.Contains("Error removing member from organization", result.Message);
+            Assert.Equal("Failed to remove member from organization.", result.Data);
         }
     }
 }

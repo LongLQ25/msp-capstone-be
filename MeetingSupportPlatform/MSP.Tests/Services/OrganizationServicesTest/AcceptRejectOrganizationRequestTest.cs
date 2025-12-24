@@ -6,11 +6,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using MSP.Application.Models.Requests.Notification;
+using MSP.Application.Models.Responses.Notification;
 using MSP.Application.Repositories;
 using MSP.Application.Services.Implementations.OrganizationInvitation;
 using MSP.Application.Services.Interfaces.Notification;
 using MSP.Application.Services.Interfaces.OrganizationInvitation;
 using MSP.Domain.Entities;
+using MSP.Shared.Common;
 using MSP.Shared.Enums;
 using Xunit;
 
@@ -36,8 +38,9 @@ namespace MSP.Tests.Services.OrganizationServicesTest
             _mockNotificationService = new Mock<INotificationService>();
             _mockConfiguration = new Mock<IConfiguration>();
 
+            var mockUserStore = new Mock<IUserStore<User>>();
             _mockUserManager = new Mock<UserManager<User>>(
-                new Mock<IUserStore<User>>().Object,
+                mockUserStore.Object,
                 null, null, null, null, null, null, null, null
             );
 
@@ -111,9 +114,10 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 .Setup(x => x.GetAllPendingInvitationsByMemberIdAsync(memberId))
                 .ReturnsAsync(new List<OrganizationInvitation> { request });
 
+            var notificationResponse = new NotificationResponse { Id = Guid.NewGuid() };
             _mockNotificationService
                 .Setup(x => x.CreateInAppNotificationAsync(It.IsAny<CreateNotificationRequest>()))
-                .Returns((Task<Shared.Common.ApiResponse<Application.Models.Responses.Notification.NotificationResponse>>)Task.CompletedTask);
+                .ReturnsAsync(ApiResponse<NotificationResponse>.SuccessResponse(notificationResponse, "Notification sent"));
 
             _mockNotificationService
                 .Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
@@ -123,12 +127,15 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.True(result.Success);
-            Assert.Contains("has been added to your organization", result.Data);
+            // Fix: Check exact message from implementation
+            Assert.Equal("Request accepted successfully.", result.Message);
+            Assert.Contains("Member User has been added to your organization", result.Data);
+            Assert.Contains("0 other pending invitation(s) have been canceled", result.Data);
 
             _mockUserManager.Verify(
-                x => x.UpdateAsync(It.Is<User>(u => 
-                    u.Id == memberId && 
-                    u.Organization == "Test Organization" && 
+                x => x.UpdateAsync(It.Is<User>(u =>
+                    u.Id == memberId &&
+                    u.Organization == "Test Organization" &&
                     u.ManagedById == businessOwnerId
                 )),
                 Times.Once
@@ -164,7 +171,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("Request not found.", result.Message);
+            // Fix: Check Data field instead of Message
+            Assert.Equal("Request not found.", result.Data);
 
             _mockUserManager.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
         }
@@ -194,7 +202,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("You are not authorized to accept this request.", result.Message);
+            // Fix: Check Data field
+            Assert.Equal("You are not authorized to accept this request.", result.Data);
         }
 
         [Fact]
@@ -221,7 +230,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("This is not a join request.", result.Message);
+            // Fix: Check Data field
+            Assert.Equal("This is not a join request.", result.Data);
         }
 
         [Fact]
@@ -248,7 +258,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Contains("This request is already", result.Message);
+            // Fix: Check exact string with status
+            Assert.Equal("This request is already Accepted.", result.Data);
         }
 
         [Fact]
@@ -318,9 +329,10 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 .Setup(x => x.UpdateRangeAsync(It.IsAny<List<OrganizationInvitation>>()))
                 .Returns(Task.CompletedTask);
 
+            var notificationResponse = new NotificationResponse { Id = Guid.NewGuid() };
             _mockNotificationService
                 .Setup(x => x.CreateInAppNotificationAsync(It.IsAny<CreateNotificationRequest>()))
-                .Returns((Task<Shared.Common.ApiResponse<Application.Models.Responses.Notification.NotificationResponse>>)Task.CompletedTask);
+                .ReturnsAsync(ApiResponse<NotificationResponse>.SuccessResponse(notificationResponse, "Notification sent"));
 
             _mockNotificationService
                 .Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
@@ -330,6 +342,9 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.True(result.Success);
+            Assert.Equal("Request accepted successfully.", result.Message);
+            // Fix: Check exact format with member name
+            Assert.Contains("Member User has been added to your organization", result.Data);
             Assert.Contains("2 other pending invitation(s) have been canceled", result.Data);
 
             _mockOrganizationInviteRepository.Verify(
@@ -387,9 +402,10 @@ namespace MSP.Tests.Services.OrganizationServicesTest
                 .Setup(x => x.UpdateAsync(It.IsAny<OrganizationInvitation>()))
                 .Returns(Task.CompletedTask);
 
+            var notificationResponse = new NotificationResponse { Id = Guid.NewGuid() };
             _mockNotificationService
                 .Setup(x => x.CreateInAppNotificationAsync(It.IsAny<CreateNotificationRequest>()))
-                .Returns((Task<Shared.Common.ApiResponse<Application.Models.Responses.Notification.NotificationResponse>>)Task.CompletedTask);
+                .ReturnsAsync(ApiResponse<NotificationResponse>.SuccessResponse(notificationResponse, "Notification sent"));
 
             _mockNotificationService
                 .Setup(x => x.SendEmailNotification(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()));
@@ -400,6 +416,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
             // Assert
             Assert.True(result.Success);
             Assert.Equal("Request rejected successfully.", result.Message);
+            // Fix: Check Data field for actual response
+            Assert.Equal("Join request has been rejected.", result.Data);
 
             _mockOrganizationInviteRepository.Verify(
                 x => x.UpdateAsync(It.Is<OrganizationInvitation>(inv =>
@@ -431,7 +449,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("Request not found.", result.Message);
+            // Fix: Check Data field
+            Assert.Equal("Request not found.", result.Data);
         }
 
         [Fact]
@@ -459,7 +478,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("You are not authorized to reject this request.", result.Message);
+            // Fix: Check Data field
+            Assert.Equal("You are not authorized to reject this request.", result.Data);
         }
 
         [Fact]
@@ -486,7 +506,8 @@ namespace MSP.Tests.Services.OrganizationServicesTest
 
             // Assert
             Assert.False(result.Success);
-            Assert.Equal("This is not a join request.", result.Message);
+            // Fix: Check Data field
+            Assert.Equal("This is not a join request.", result.Data);
         }
 
         #endregion
